@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>ld-demo</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- BUMP THESE: check Maven Central for the latest release of each artifact. -->
+    <ld.server.version>7.17.2</ld.server.version>
+    <ld.ai.version>0.3.0</ld.ai.version>
+
+    <!-- Default class for `mvn compile exec:java`. Override with -Dexec.mainClass=... -->
+    <exec.mainClass>com.example.ldemo.FeatureFlagDemo</exec.mainClass>
+  </properties>
+
+  <dependencies>
+    <!-- Core server-side SDK: feature flags, contexts, events -->
+    <dependency>
+      <groupId>com.launchdarkly</groupId>
+      <artifactId>launchdarkly-java-server-sdk</artifactId>
+      <version>${ld.server.version}</version>
+    </dependency>
+
+    <!-- Java AI SDK (extra credit): AI Configs. Pre-1.0, API may change. -->
+    <dependency>
+      <groupId>com.launchdarkly</groupId>
+      <artifactId>launchdarkly-java-server-sdk-ai</artifactId>
+      <version>${ld.ai.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>

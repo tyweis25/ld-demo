@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Amelia's Babysitting Service</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #3A2B55;
+    --paper: #EDE4F5;
+    --surface: #F7F1FC;
+    --rule: #D2C2E6;
+    --muted: #6B5A82;
+    --signal: #5B3A9E;
+    --signal-tint: #E4D7F5;
+    --hold: #8A5A9E;
+    --hold-tint: #F0E4F7;
+    --focus: #7B5BB5;
+    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+    --body: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #f4ecfb 0%, transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, #e0d0f0 0%, transparent 50%),
+      var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.5 var(--body);
+  }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  button, input { font: inherit; color: inherit; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+
+  .page { max-width: 1080px; margin: 0 auto; padding: 20px 20px 64px; }
+
+  /* Header and shopper switcher */
+  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 700 22px/1 var(--display); }
+  .brand svg { color: var(--ink); }
+  .who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .who-label { color: var(--muted); font-size: 14px; }
+  .who-list { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
+  .who-btn {
+    text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 8px 12px; cursor: pointer; min-height: 44px;
+  }
+  .who-btn b { display: block; font-weight: 600; font-size: 14px; }
+  .who-btn span { display: block; font-size: 12px; color: var(--muted); }
+  .who-btn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+
+  /* Release inspector: the left bar carries the checkout flag's state */
+  .inspector {
+    position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
+    padding: 16px 20px 14px 28px; margin-bottom: 24px;
+  }
+  .inspector::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+    background: var(--hold); transition: background-color .3s ease;
+  }
+  .inspector[data-on="true"]::before { background: var(--signal); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 24px; margin: 0; }
+  .facts dt { font-size: 13px; color: var(--muted); }
+  .facts dd { margin: 2px 0 0; font-weight: 600; }
+  .pill { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--hold-tint); color: var(--hold); }
+  .pill[data-state="on"] { background: var(--signal-tint); color: var(--signal); }
+  .why { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+  .insp-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 10px; font-size: 13px; color: var(--muted); }
+  details.api { margin-top: 8px; font-size: 13px; }
+  details.api summary { cursor: pointer; color: var(--muted); width: fit-content; }
+  details.api pre { margin: 8px 0 0; padding: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .notice { border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
+  .notice-error { background: #FBE9E7; color: #8A2A1B; border: 1px solid #F0C2BA; }
+  .toast { background: var(--ink); color: #fff; margin-bottom: 16px; padding: 12px 16px; border-radius: 4px; font-weight: 500; }
+  .toast[hidden], .notice[hidden] { display: none; }
+
+  /* Main layout */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; align-items: start; }
+  .checkout { min-width: 0; }
+  .checkout.swap { animation: swap .28s ease-out; }
+  @keyframes swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .checkout h1 { font-size: 30px; margin-bottom: 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .loading { color: var(--muted); padding: 24px 0; }
+
+  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; margin-bottom: 16px; }
+  .panel h2 { font-size: 19px; margin-bottom: 14px; }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field.wide { grid-column: 1 / -1; }
+  .field label { font-size: 14px; font-weight: 500; }
+  .field input { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: #FBF7FF; min-height: 44px; }
+  .choice { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--rule); border-radius: 6px; margin-bottom: 8px; cursor: pointer; }
+  .choice input { width: 18px; height: 18px; accent-color: var(--ink); }
+  .review-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  .review-row:last-child { border-bottom: 0; }
+  .review-row span:first-child { color: var(--muted); }
+
+  .steps { display: flex; list-style: none; padding: 0; margin: 0 0 20px; border-bottom: 1px solid var(--rule); }
+  .steps li { flex: 1; padding: 0 0 12px; color: var(--muted); font-size: 15px; border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .steps li b { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--rule); font-size: 13px; }
+  .steps li[aria-current="step"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+  .steps li[aria-current="step"] b { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .steps li[data-done="true"] b { background: var(--signal-tint); border-color: var(--signal); color: var(--signal); }
+
+  .actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+  .btn { background: var(--ink); color: #fff; border: 0; border-radius: 6px; padding: 12px 22px; font-weight: 600; cursor: pointer; min-height: 44px; }
+  .btn:hover { background: #4E3A6E; }
+  .btn[disabled] { opacity: .6; cursor: progress; }
+  .btn-quiet { background: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; padding: 12px 8px; }
+  .btn-quiet:hover { background: transparent; text-decoration-thickness: 2px; }
+
+  /* Right column: order summary and AI assistant */
+  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .summary { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; }
+  .summary h2 { font-size: 19px; margin-bottom: 12px; }
+  .item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  .item small { display: block; color: var(--muted); font-size: 13px; }
+  .totals { display: flex; justify-content: space-between; padding-top: 14px; font-weight: 600; font-size: 18px; }
+  .ship { display: flex; justify-content: space-between; padding: 10px 0 0; color: var(--muted); font-size: 14px; }
+
+  .assistant { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; }
+  .assistant h2 { font-size: 19px; margin-bottom: 6px; }
+  .assistant .sub { font-size: 14px; margin: 0 0 12px; }
+  .quick { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .quick button { text-align: left; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; font-size: 14px; }
+  .quick button:hover { border-color: var(--ink); }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; min-height: 44px; background: #FBF7FF; }
+  .ask .btn { padding: 12px 16px; }
+  .answer { margin-top: 14px; border-left: 3px solid var(--signal); padding-left: 12px; }
+  .answer p { margin: 0; }
+  .answer .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .answer.failed { border-left-color: var(--hold); }
+  .off { background: var(--hold-tint); border-radius: 4px; padding: 12px 14px; color: #5E3700; }
+  .off p { margin: 0; }
+  .off p + p { margin-top: 4px; }
+  .ks { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+  .btn-ks { background: #FBF7FF; color: var(--hold); border: 1px solid var(--hold); border-radius: 6px; padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
+  .btn-ks[data-restore="true"] { color: var(--signal); border-color: var(--signal); }
+  .btn-ks[disabled] { opacity: .55; cursor: not-allowed; }
+  .hint { display: block; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  .placed h1 { font-size: 30px; }
+  .placed p { max-width: 60ch; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .fields { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .checkout.swap { animation: none; }
+    .inspector::before { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <div class="brand">
+      <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20"/><path d="M4 3h13l-4 5 4 5H4"/></svg>
+      <span>Amelia's Babysitting Service</span>
+    </div>
+    <div class="who">
+      <span class="who-label" id="who-label">Booking as</span>
+      <div class="who-list" id="who" role="group" aria-labelledby="who-label"></div>
+    </div>
+  </header>
+
+  <div class="notice notice-error" id="offline" role="alert" hidden>
+    Can't reach the booking service. Make sure it's running with <code>./run.sh web</code>, then refresh this page.
+  </div>
+
+  <section class="inspector" id="inspector" data-on="false" aria-label="Release inspector">
+    <dl class="facts" id="facts"></dl>
+    <p class="why" id="why"></p>
+    <details class="api">
+      <summary>Show API response</summary>
+      <pre id="raw">Waiting for the first response...</pre>
+    </details>
+    <div class="insp-foot">
+      <span>The page asks the server for this shopper's flag values every 2 seconds.</span>
+      <span id="checked"></span>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <div class="layout">
+    <main class="checkout" id="checkout">
+      <p class="loading">Connecting to LaunchDarkly...</p>
+    </main>
+
+    <div class="side">
+      <aside class="summary" aria-label="Booking summary">
+        <h2>Booking summary</h2>
+        <div id="items"></div>
+        <div class="ship"><span>Travel fee</span><span>Free</span></div>
+        <div class="totals"><span>Total</span><span id="total"></span></div>
+      </aside>
+
+      <section class="assistant" id="assistant" aria-labelledby="assistant-title">
+        <h2 id="assistant-title">Ask about your booking</h2>
+        <div id="assistant-body"></div>
+        <div class="ks" id="ks"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CART = [
+    { name: "Friday evening sitter", note: "4 hours, 6–10pm", qty: 1, price: 96.00 },
+    { name: "Weekend afternoon backup", note: "Saturday, 3 hours", qty: 1, price: 72.00 },
+    { name: "Overnight add-on", note: "Same-day extension", qty: 1, price: 45.00 }
+  ];
+  const TOTAL = CART.reduce((sum, i) => sum + i.qty * i.price, 0);
+
+  const SHOPPERS = [
+    { id: "amelia", name: "Amelia Smith", org: "org-ld",     orgName: "Amelia's Babysitting Service", tier: "enterprise", role: "admin" },
+    { id: "harper", name: "Harper Reed",  org: "org-ld",     orgName: "Amelia's Babysitting Service", tier: "enterprise", role: "parent" },
+    { id: "liam",   name: "Liam Carter",  org: "org-bright", orgName: "Parkside Parents Co-op",       tier: "free",       role: "parent" }
+  ];
+
+  const QUESTIONS = ["Can I change the sitter time?", "What are your cancellation rules?", "Are your sitters background-checked?"];
+
+  const REASONS = {
+    OFF: "Targeting is off for this flag, so everyone gets the off variation.",
+    FALLTHROUGH: "No targeting rule matched, so the default rule applied.",
+    RULE_MATCH: "This shopper matched a targeting rule.",
+    TARGET_MATCH: "This shopper is individually targeted.",
+    PREREQUISITE_FAILED: "A prerequisite flag isn't on, so the off variation is served.",
+    ERROR: "LaunchDarkly couldn't evaluate the flag, so the safe default is used."
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const money = (n) => "$" + n.toFixed(2);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const first = (name) => name.split(" ")[0];
+
+  const state = {
+    shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, toastTimer: null,
+    config: { can_toggle: false, assistant_flag: "ai-assistant-enabled", live_model: false },
+    assistantEnabled: null, answer: null, asking: false, ksBusy: false
+  };
+
+  const params = (s) => new URLSearchParams({ user: s.id, name: s.name, org: s.org, tier: s.tier, role: s.role });
+
+  // Every POST carries a custom header. The server rejects POSTs without it, which stops
+  // other websites from making your browser call this local app.
+  const post = (url) => fetch(url, { method: "POST", headers: { "X-LD-Demo": "1" } });
+
+  // ---------- Static pieces ----------
+  function renderSummary() {
+    $("#items").innerHTML = CART.map((i) =>
+      `<div class="item"><div>${esc(i.name)}<small>${esc(i.note)}, quantity ${i.qty}</small></div><div>${money(i.qty * i.price)}</div></div>`
+    ).join("");
+    $("#total").textContent = money(TOTAL);
+  }
+
+  function renderShoppers() {
+    $("#who").innerHTML = SHOPPERS.map((s) =>
+      `<button type="button" class="who-btn" aria-pressed="${s.id === state.shopper.id}" data-id="${s.id}">
+         <b>${esc(s.name)}</b><span>${esc(s.orgName)}, ${esc(s.tier)} plan</span>
+       </button>`
+    ).join("");
+  }
+
+  // ---------- Release inspector ----------
+  function renderInspector() {
+    const d = state.data, s = state.shopper;
+    $("#inspector").dataset.on = String(d.enabled);
+    $("#facts").innerHTML = `
+      <div><dt>Deployed version</dt><dd>${esc(d.app_version)}</dd></div>
+      <div><dt>Feature flag ${esc(d.flag)}</dt><dd><span class="pill" data-state="${d.enabled ? "on" : "off"}">${d.enabled ? "On" : "Off"}</span></dd></div>
+      <div><dt>Booking flow this shopper sees</dt><dd>${esc(d.flow)}</dd></div>
+      <div><dt>AI assistant kill switch ${esc(state.config.assistant_flag)}</dt><dd><span class="pill" data-state="${d.assistant_enabled ? "on" : "off"}">${d.assistant_enabled ? "On" : "Off"}</span></dd></div>
+      <div><dt>Context sent to LaunchDarkly</dt><dd>${esc(s.name)} (${esc(s.role)}) at ${esc(s.orgName)}, ${esc(s.tier)}</dd></div>`;
+    $("#why").textContent = REASONS[d.reason_kind] || d.reason;
+    $("#raw").textContent = JSON.stringify(d, null, 2);
+  }
+
+  function markChecked() {
+    $("#checked").textContent = "Last checked " + new Date().toLocaleTimeString();
+  }
+
+  function toast(message) {
+    const t = $("#toast");
+    t.textContent = message;
+    t.hidden = false;
+    clearTimeout(state.toastTimer);
+    state.toastTimer = setTimeout(() => { t.hidden = true; }, 8000);
+  }
+
+  // ---------- AI assistant and kill switch ----------
+  function renderAssistant() {
+    const body = $("#assistant-body"), ks = $("#ks");
+    const typedEl = document.querySelector("#q");
+    const typed = (typedEl && typedEl.value) || "";
+
+    if (state.assistantEnabled === null) {
+      body.innerHTML = `<p class="sub">Checking whether the assistant is available...</p>`;
+      ks.innerHTML = "";
+      return;
+    }
+
+    if (!state.assistantEnabled) {
+      body.innerHTML = `<div class="off"><p><b>The AI assistant is turned off.</b></p><p>Please contact our support team for help with your booking.</p></div>`;
+    } else {
+      const d = state.answer;
+      let answer = "";
+      if (d && d.ok) {
+        const note = d.live ? "" : " Simulated reply. Add ANTHROPIC_API_KEY for live answers.";
+        answer = `<div class="answer"><p>${esc(d.reply)}</p>
+          <p class="meta">Model ${esc(d.model)}, ${d.input_tokens} tokens in and ${d.output_tokens} out, ${d.latency_ms} ms.${esc(note)}</p></div>`;
+      } else if (d && d.ok === false) {
+        answer = `<div class="answer failed"><p>The model call failed. ${esc(d.error || "")}</p></div>`;
+      }
+      body.innerHTML = `
+        <p class="sub">Answers come from the AI model LaunchDarkly serves to this parent.</p>
+        <div class="quick">${QUESTIONS.map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+        <div class="ask">
+          <label class="sr" for="q">Your question</label>
+          <input id="q" maxlength="500" placeholder="Type a question" autocomplete="off" value="${esc(typed)}">
+          <button type="button" class="btn" data-ai="ask" ${state.asking ? "disabled" : ""}>${state.asking ? "Asking..." : "Ask"}</button>
+        </div>
+        <div id="answer" aria-live="polite">${answer}</div>`;
+    }
+
+    const on = state.assistantEnabled, can = state.config.can_toggle;
+    const label = state.ksBusy ? "Working..." : (on ? "Turn off AI assistant" : "Turn AI assistant back on");
+    const hint = can
+      ? (on ? "Kill switch: turns the assistant off for every shopper, with no redeploy." : "The assistant is off for every shopper.")
+      : `To use this button, add LD_API_TOKEN, LD_PROJECT_KEY, and LD_ENV_KEY to .env. Or flip ${esc(state.config.assistant_flag)} in the dashboard.`;
+    ks.innerHTML = `<button type="button" class="btn-ks" data-ai="ks" data-restore="${!on}" ${(!can || state.ksBusy) ? "disabled" : ""}>${label}</button><span class="hint">${hint}</span>`;
+  }
+
+  async function askAssistant(question) {
+    question = (question || "").trim();
+    if (!question || state.asking || !state.assistantEnabled) return;
+    state.asking = true;
+    renderAssistant();
+    try {
+      const p = params(state.shopper);
+      p.set("question", question);
+      const res = await post("/api/assistant?" + p);
+      const data = await res.json();
+      if (data.available === undefined) throw new Error(data.error || "Unexpected response");
+      if (data.available === false) {
+        state.assistantEnabled = false;   // the kill switch was flipped after the last poll
+        state.answer = null;
+      } else {
+        state.answer = data;
+      }
+    } catch (err) {
+      state.answer = { ok: false, error: "Check that the service is running, then try again." };
+    } finally {
+      state.asking = false;
+      renderAssistant();
+    }
+  }
+
+  async function toggleKillSwitch() {
+    if (state.ksBusy || !state.config.can_toggle) return;
+    const target = state.assistantEnabled ? "off" : "on";
+    state.ksBusy = true;
+    renderAssistant();
+    try {
+      const res = await post("/api/killswitch?state=" + target);
+      const data = await res.json();
+      if (!data.ok) toast(data.error || "The kill switch didn't change.");
+    } catch (err) {
+      toast("Couldn't reach the service. Check that it's running, then try again.");
+    } finally {
+      state.ksBusy = false;
+      renderAssistant();
+      setTimeout(poll, 700);   // the page learns the new value from the server, like any other change
+    }
+  }
+
+  // ---------- Checkout views ----------
+  const shippingFields = () => `
+    <div class="fields">
+      <div class="field wide"><label for="f-name">Parent name</label><input id="f-name" value="${esc(state.shopper.name)}" autocomplete="off"></div>
+      <div class="field wide"><label for="f-street">Care address</label><input id="f-street" value="400 Main Street" autocomplete="off"></div>
+      <div class="field"><label for="f-city">City</label><input id="f-city" value="Dallas" autocomplete="off"></div>
+      <div class="field"><label for="f-zip">Postal code</label><input id="f-zip" value="75201" autocomplete="off"></div>
+    </div>`;
+
+  const paymentFields = () => `
+    <label class="choice"><input type="radio" name="pay" checked> Visa ending 4242, expires 08/28</label>
+    <label class="choice"><input type="radio" name="pay"> Pay from family account</label>`;
+
+  const reviewRows = () => `
+    <div class="review-row"><span>Care at</span><span>${esc(state.shopper.name)}, 400 Main Street, Dallas 75201</span></div>
+    <div class="review-row"><span>Payment</span><span>Visa ending 4242</span></div>
+    <div class="review-row"><span>Total</span><span>${money(TOTAL)}</span></div>`;
+
+  function viewLegacy() {
+    const labels = ["Address", "Payment", "Review"];
+    const steps = labels.map((l, i) =>
+      `<li ${i === state.step ? 'aria-current="step"' : ""} data-done="${i < state.step}"><b>${i + 1}</b>${l}</li>`
+    ).join("");
+    let body, actions;
+    if (state.step === 0) {
+      body = `<section class="panel"><h2>Care address</h2>${shippingFields()}</section>`;
+      actions = `<button class="btn" data-action="next">Continue to payment</button>`;
+    } else if (state.step === 1) {
+      body = `<section class="panel"><h2>Payment</h2>${paymentFields()}</section>`;
+      actions = `<button class="btn" data-action="next">Continue to review</button><button class="btn btn-quiet" data-action="back">Back</button>`;
+    } else {
+      body = `<section class="panel"><h2>Review</h2>${reviewRows()}</section>`;
+      actions = `<button class="btn" data-action="place">Book session</button><button class="btn btn-quiet" data-action="back">Back</button>`;
+    }
+    return `<h1>Book a sitter</h1><p class="sub">Three steps: address, payment, then review.</p>
+      <ol class="steps" aria-label="Booking progress">${steps}</ol>${body}<div class="actions">${actions}</div>`;
+  }
+
+  function viewNew() {
+    return `<h1>Book a sitter</h1><p class="sub">Address, payment, and review are all on this page.</p>
+      <section class="panel"><h2>Care address</h2>${shippingFields()}</section>
+      <section class="panel"><h2>Payment</h2>${paymentFields()}</section>
+      <section class="panel"><h2>Review</h2>${reviewRows()}</section>
+      <div class="actions"><button class="btn" data-action="place">Book session</button></div>`;
+  }
+
+  function viewPlaced() {
+    const p = state.placed;
+    return `<div class="placed"><h1>Booking confirmed</h1>
+      <p>Thanks, ${esc(first(state.shopper.name))}. This booking used the ${esc(p.flow)}.</p>
+      <p>LaunchDarkly received a <b>checkout-completed</b> event and ${money(p.amount)} of <b>checkout-revenue</b> for this parent. Those events feed experiments and guarded rollouts.</p>
+      <div class="actions"><button class="btn" data-action="again">Book another session</button></div></div>`;
+  }
+
+  function renderCheckout(swap) {
+    const el = $("#checkout");
+    el.innerHTML = state.placed ? viewPlaced() : (state.enabled ? viewNew() : viewLegacy());
+    el.classList.remove("swap");
+    if (swap) { void el.offsetWidth; el.classList.add("swap"); }
+  }
+
+  // ---------- Talking to the server ----------
+  function setOffline(off) { $("#offline").hidden = !off; }
+
+  async function poll() {
+    if (state.inflight || document.hidden) return;
+    state.inflight = true;
+    const shopper = state.shopper;
+    let stale = false;
+    try {
+      const res = await fetch("/api/checkout?" + params(shopper), { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (shopper !== state.shopper) { stale = true; return; }   // shopper changed mid-request
+      setOffline(false);
+      markChecked();
+
+      const previous = state.enabled;
+      const prevAssistant = state.assistantEnabled;
+      const changed = JSON.stringify(data) !== JSON.stringify(state.data);
+      state.data = data;
+      state.enabled = data.enabled;
+      state.assistantEnabled = data.assistant_enabled;
+
+      if (changed) renderInspector();
+
+      if (prevAssistant === null) {
+        renderAssistant();
+      } else if (prevAssistant !== data.assistant_enabled) {
+        state.answer = null;
+        renderAssistant();
+        toast(data.assistant_enabled
+          ? `The AI assistant is back on for ${first(state.shopper.name)}.`
+          : `The AI assistant was turned off for ${first(state.shopper.name)}. One switch, no redeploy.`);
+      }
+
+      if (previous === null) {
+        renderCheckout(false);
+      } else if (previous !== data.enabled) {
+        state.step = 0;
+        state.placed = null;
+        renderCheckout(true);
+        toast(data.enabled
+          ? `The new one-page booking flow is live for ${first(state.shopper.name)}. No redeploy and no refresh.`
+          : `Rolled back to the classic booking flow for ${first(state.shopper.name)}. No redeploy and no refresh.`);
+      }
+    } catch (err) {
+      setOffline(true);
+    } finally {
+      state.inflight = false;
+      if (stale) poll();
+    }
+  }
+
+  async function placeOrder(button) {
+    button.disabled = true;
+    try {
+      const p = params(state.shopper);
+      p.set("amount", TOTAL.toFixed(2));
+      const res = await post("/api/order?" + p);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      state.placed = await res.json();
+      renderCheckout(false);
+    } catch (err) {
+      button.disabled = false;
+      toast("The booking didn't go through. Check that the service is running, then try again.");
+    }
+  }
+
+  // ---------- Events ----------
+  $("#checkout").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-action]");
+    if (!b) return;
+    const a = b.dataset.action;
+    if (a === "next") { state.step = Math.min(2, state.step + 1); renderCheckout(false); }
+    else if (a === "back") { state.step = Math.max(0, state.step - 1); renderCheckout(false); }
+    else if (a === "place") { placeOrder(b); }
+    else if (a === "again") { state.placed = null; state.step = 0; renderCheckout(false); }
+  });
+
+  $("#assistant").addEventListener("click", (e) => {
+    const q = e.target.closest("[data-q]");
+    if (q) { askAssistant(q.dataset.q); return; }
+    const b = e.target.closest("[data-ai]");
+    if (!b) return;
+    if (b.dataset.ai === "ask") { const input = document.querySelector("#q"); askAssistant(input && input.value); }
+    else if (b.dataset.ai === "ks") { toggleKillSwitch(); }
+  });
+  $("#assistant").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target && e.target.id === "q") askAssistant(e.target.value);
+  });
+
+  $("#who").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-id]");
+    if (!b) return;
+    state.shopper = SHOPPERS.find((s) => s.id === b.dataset.id);
+    state.enabled = null;   // switching shoppers is not a release, so re-render without a toast
+    state.assistantEnabled = null;
+    state.data = null;
+    state.answer = null;
+    state.step = 0;
+    state.placed = null;
+    $("#toast").hidden = true;
+    renderShoppers();
+    renderAssistant();
+    poll();
+  });
+
+  renderSummary();
+  renderShoppers();
+  renderAssistant();
+  fetch("/api/config").then((r) => r.json()).then((cfg) => {
+    state.config = cfg;
+    renderAssistant();
+    if (state.data) renderInspector();
+  }).catch(() => {});
+  poll();
+  setInterval(poll, 2000);
+})();
+</script>
+</body>
+</html>
