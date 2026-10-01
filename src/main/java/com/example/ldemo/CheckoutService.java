@@ -256,7 +256,7 @@ public class CheckoutService {
     }
 
     /** Same multi-context shape as the other demos: a user who belongs to an organization. */
-    private static LDContext contextFrom(Map<String, String> q) {
+    static LDContext contextFrom(Map<String, String> q) {
         String user = q.getOrDefault("user", "anonymous");
         // plan mirrors tier so AI Config rules that target user.plan (enterprise vs free) match the shopper switcher.
         String plan = q.getOrDefault("plan", q.getOrDefault("tier", "free"));
@@ -270,11 +270,11 @@ public class CheckoutService {
         return LDContext.createMulti(userCtx, orgCtx);
     }
 
-    private static String flowName(boolean enabled) {
+    static String flowName(boolean enabled) {
         return enabled ? "new one-page booking" : "classic multi-step booking";
     }
 
-    private static double parseAmount(String raw) {
+    static double parseAmount(String raw) {
         try {
             double v = Double.parseDouble(raw);
             return (v > 0 && v < 100_000) ? v : 0;

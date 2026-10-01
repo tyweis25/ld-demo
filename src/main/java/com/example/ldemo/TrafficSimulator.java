@@ -40,13 +40,24 @@ public class TrafficSimulator {
     private static final double LEGACY_AVG_ORDER = 55.0,  NEW_AVG_ORDER = 62.0;
     private static final double BASE_ERROR_RATE = 0.02,   BAD_ERROR_RATE = 0.15;
 
-    public static void main(String[] args) throws Exception {
-        String sdkKey = System.getenv("LD_SDK_KEY");
-        if (sdkKey == null || sdkKey.isBlank()) {
-            System.err.println("Missing LD_SDK_KEY. Export your server-side SDK key first.");
-            System.exit(1);
-        }
+    /** CLI options for the simulator (package-visible for unit tests). */
+    static final class Options {
+        final String flagKey;
+        final int minutes;
+        final int rate;
+        final int users;
+        final boolean bad;
 
+        Options(String flagKey, int minutes, int rate, int users, boolean bad) {
+            this.flagKey = flagKey;
+            this.minutes = minutes;
+            this.rate = rate;
+            this.users = users;
+            this.bad = bad;
+        }
+    }
+
+    static Options parseOptions(String[] args) {
         String flagKey = "new-checkout-flow";
         int minutes = 15, rate = 20, users = 3000;
         boolean bad = false;
@@ -57,7 +68,34 @@ public class TrafficSimulator {
             else if (a.startsWith("--users=")) users = Integer.parseInt(a.substring(8));
             else if (a.equals("--bad")) bad = true;
         }
-        double newErrorRate = bad ? BAD_ERROR_RATE : BASE_ERROR_RATE;
+        return new Options(flagKey, minutes, rate, users, bad);
+    }
+
+    static double newErrorRate(boolean bad) {
+        return bad ? BAD_ERROR_RATE : BASE_ERROR_RATE;
+    }
+
+    /** One simulated shopper multi-context (same shape as the main loop). */
+    static LDContext simContext(int userIndex) {
+        String[] org = ORGS[Math.floorMod(userIndex, ORGS.length)];
+        LDContext user = LDContext.builder("sim-user-" + userIndex)
+                .set("role", userIndex % 10 == 0 ? "admin" : "buyer").build();
+        LDContext orgCtx = LDContext.builder(FeatureFlagDemo.ORGANIZATION, org[0])
+                .name(org[1]).set("tier", org[2]).build();
+        return LDContext.createMulti(user, orgCtx);
+    }
+
+    public static void main(String[] args) throws Exception {
+        String sdkKey = System.getenv("LD_SDK_KEY");
+        if (sdkKey == null || sdkKey.isBlank()) {
+            System.err.println("Missing LD_SDK_KEY. Export your server-side SDK key first.");
+            System.exit(1);
+        }
+
+        Options opt = parseOptions(args);
+        String flagKey = opt.flagKey;
+        int minutes = opt.minutes, rate = opt.rate, users = opt.users;
+        double newErrorRate = newErrorRate(opt.bad);
 
         System.out.printf("Simulating %d sessions/sec for %d min on flag '%s' (%d users). NEW error rate: %.0f%%%n%n",
                 rate, minutes, flagKey, users, newErrorRate * 100);
@@ -79,12 +117,7 @@ public class TrafficSimulator {
             while (System.currentTimeMillis() < end) {
                 for (int i = 0; i < rate; i++) {
                     int u = rnd.nextInt(users);
-                    String[] org = ORGS[u % ORGS.length]; // each user always belongs to the same org
-                    LDContext user = LDContext.builder("sim-user-" + u)
-                            .set("role", u % 10 == 0 ? "admin" : "buyer").build();
-                    LDContext orgCtx = LDContext.builder(FeatureFlagDemo.ORGANIZATION, org[0])
-                            .name(org[1]).set("tier", org[2]).build();
-                    LDContext ctx = LDContext.createMulti(user, orgCtx);
+                    LDContext ctx = simContext(u);
 
                     boolean isNew = client.boolVariation(flagKey, ctx, false);
                     int v = isNew ? 1 : 0;
