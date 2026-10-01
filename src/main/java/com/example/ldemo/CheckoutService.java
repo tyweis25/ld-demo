@@ -258,9 +258,12 @@ public class CheckoutService {
     /** Same multi-context shape as the other demos: a user who belongs to an organization. */
     private static LDContext contextFrom(Map<String, String> q) {
         String user = q.getOrDefault("user", "anonymous");
+        // plan mirrors tier so AI Config rules that target user.plan (enterprise vs free) match the shopper switcher.
+        String plan = q.getOrDefault("plan", q.getOrDefault("tier", "free"));
         LDContext userCtx = LDContext.builder("user-" + user)
                 .name(q.getOrDefault("name", user))
-                .set("role", q.getOrDefault("role", "buyer")).build();
+                .set("role", q.getOrDefault("role", "buyer"))
+                .set("plan", plan).build();
         // A real service would look these attributes up server-side instead of trusting the caller.
         LDContext orgCtx = LDContext.builder(FeatureFlagDemo.ORGANIZATION, q.getOrDefault("org", "org-ld"))
                 .set("tier", q.getOrDefault("tier", "free")).build();
