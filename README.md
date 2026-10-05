@@ -12,13 +12,13 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 
 | Requirement | Where it is implemented | How to run it |
 |---|---|---|
-| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form: **classic multi-step UI** (flag off) vs **Harbor Dusk express UI** (flag on). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
-| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The **entire look-and-feel** swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
-| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` or the discreet **Remediate** control on the new UI (`POST /api/remediate`) POSTs it. SSE flips the page back to classic. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` or click Remediate on the Harbor Dusk UI. |
+| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form **inside the classic Amelia UI**: multi-step (flag off) vs one-page (flag on). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
+| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The booking form swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
+| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` or the discreet **Remediate** control on the one-page form (`POST /api/remediate`) POSTs it. SSE rolls everyone back to multi-step. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` or click Remediate on the one-page checkout. |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
 | **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH` (individual targets are evaluated **before** rules). For a clearer “beats the free-tier rule” demo, temporarily add `user-liam` → `true`, then remove it again. | Select Harper (reason `TARGET_MATCH`). |
-| **Part 2 — Rule-based targeting** | Rules: **organization** `tier` is `enterprise` → `true` (Harbor Dusk); `tier` is `free` → `false` (classic). Inspector reason: `RULE_MATCH`. | Amelia = Harbor Dusk; Liam = classic. |
+| **Part 2 — Rule-based targeting** | Rules: **organization** `tier` is `enterprise` → `true` (one-page); `tier` is `free` → `false` (multi-step). Inspector reason: `RULE_MATCH`. | Amelia = one-page; Liam = multi-step. |
 | **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
 | **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
 | **Extra credit — Integrations** | (1) LaunchDarkly hosted MCP + agent skills (`.cursor/mcp.json`, `.agents/skills`) for Cursor. (2) Flag trigger remediate (`LD_FLAG_TRIGGER_URL` + `./run.sh remediate`). | Connect MCP in Cursor; run `./run.sh remediate` after setting the trigger URL. |
@@ -136,7 +136,7 @@ Every evaluation is a **user + organization** multi-context. Account-level rules
 | Harper Reed | `user-harper` | parent | same org as Amelia | enterprise |
 | Liam Carter | `user-liam` | parent | `org-bright` Parkside Parents Co-op | free |
 
-Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **enterprise rule** (`RULE_MATCH` → Harbor Dusk), Liam matches the **free rule** (`RULE_MATCH` → classic), and Harper is an **individual target** (`TARGET_MATCH` → Harbor Dusk). Individual targeting is evaluated before rules — for a live “override free tier” beat, temporarily add `user-liam` → `true`, then remove it so free stays classic.
+Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **enterprise rule** (`RULE_MATCH` → one-page), Liam matches the **free rule** (`RULE_MATCH` → multi-step), and Harper is an **individual target** (`TARGET_MATCH` → one-page). Individual targeting is evaluated before rules — for a live “override free tier” beat, temporarily add `user-liam` → `true`, then remove it so free stays multi-step.
 
 ## LaunchDarkly objects the code expects
 
@@ -147,12 +147,12 @@ Recreate these in your trial project if they are not already there. The code key
 **`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
 
 1. **Individual targeting:** add user key `user-harper` to serve `true` (shows `TARGET_MATCH` in the inspector). Optional demo: temporarily add `user-liam` → `true` to show individual targets beating the free-tier rule, then remove Liam again.
-2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true` (Harbor Dusk).
-3. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `free` → `false` (classic).
-4. Default / fallthrough: `false` (classic).
+2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true` (one-page booking).
+3. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `free` → `false` (multi-step booking).
+4. Default / fallthrough: `false` (multi-step).
 5. Targeting On.
 
-Amelia (enterprise) gets Harbor Dusk via the rule. Liam (`org-bright` / free) gets classic via the free rule. Harper gets Harbor Dusk as an individual target (`TARGET_MATCH`).
+Amelia (enterprise) gets one-page checkout via the rule. Liam (`org-bright` / free) gets multi-step via the free rule. Harper gets one-page as an individual target (`TARGET_MATCH`). All of this stays inside the classic Amelia lavender UI.
 
 **Flag trigger (Part 1 remediate)**
 
@@ -276,12 +276,12 @@ mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 The inspector at the top shows checkout variation, assistant on/off, booking-agent variation, latest accuracy score, and the evaluation reason.
 
 - **Booking As** switches Amelia / Harper / Liam. The layout, assistant variation, and booking tools change with that context.
-- **Classic UI** (`new-checkout-flow` off): Address → Payment → Review (lavender / Fraunces look).
-- **Harbor Dusk UI** (`new-checkout-flow` on): a visually distinct express booking sheet (teal dusk band, Literata/Sora, amber accent). Remediate / flag-off returns to classic.
-- The page opens an **SSE** connection to `/api/events`. When the SDK sees a flag change, the UI refreshes immediately. A 10s poll remains as fallback.
+- **Multi-step booking** (`new-checkout-flow` off): Address → Payment → Review.
+- **One-page booking** (`new-checkout-flow` on): all three on one page — same classic Amelia chrome.
+- The page opens an **SSE** connection to `/api/events`. When the SDK sees a flag change, the form refreshes immediately. A 3s poll remains as fallback.
 - **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
 - **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set. Otherwise the button is disabled and you flip the flag in the dashboard.
-- **Remediate To Classic UI** (new experience only) POSTs `/api/remediate`, which curls `LD_FLAG_TRIGGER_URL` on the server. Same effect as `./run.sh remediate`.
+- **Remediate (Turn Flag Off)** (one-page form only) POSTs `/api/remediate`, which curls `LD_FLAG_TRIGGER_URL` on the server. Same effect as `./run.sh remediate`.
 - **Find Sitters / Confirm Booking** go through Java to the Python sidecar.
 
 ### HTTP API
