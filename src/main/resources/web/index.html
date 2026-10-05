@@ -871,6 +871,18 @@
     if (e.key === "Enter" && e.target && e.target.id === "bq") askBooking(false);
   });
 
+  // Instant updates via Server-Sent Events (SDK flag-change listener → /api/events).
+  // Polling remains a slow fallback if the SSE connection drops.
+  function connectEvents() {
+    try {
+      const es = new EventSource("/api/events");
+      es.addEventListener("flag-change", () => { poll(); });
+      es.onerror = () => { /* EventSource reconnects automatically */ };
+    } catch (err) {
+      // Older browsers: polling alone is enough.
+    }
+  }
+
   renderSummary();
   renderShoppers();
   renderAssistant();
@@ -880,8 +892,9 @@
     renderAssistant();
     if (state.data) renderInspector();
   }).catch(() => {});
+  connectEvents();
   poll();
-  setInterval(poll, 2000);
+  setInterval(poll, 10000);
 })();
 </script>
 </body>

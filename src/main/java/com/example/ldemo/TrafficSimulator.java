@@ -14,11 +14,13 @@ import java.util.Random;
  * Every simulated shopper is a multi-context (user + organization), same as FeatureFlagDemo.
  *
  * Options (all optional):
- *   --flag=new-checkout-flow   flag to evaluate
+ *   --flag=new-checkout-flow   flag to evaluate (create this boolean flag; use new-payment-service for guarded)
  *   --minutes=15               how long to run
  *   --rate=20                  sessions per second
  *   --users=3000               size of the simulated user pool (each counts as a context in LD)
  *   --bad                      make the NEW variation throw many more errors, to trigger a rollback
+ *
+ * Requires LD_SDK_KEY (server-side SDK key in .env).
  *
  * Run:
  *   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=20"

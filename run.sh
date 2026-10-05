@@ -28,6 +28,7 @@ case "${1:-help}" in
     command -v mvn  >/dev/null && mvn -v | head -1 || echo "Maven not found"
     echo "LD_SDK_KEY:        set"
     [[ -n "${ANTHROPIC_API_KEY:-}" ]] && echo "ANTHROPIC_API_KEY: set (live AI)" || echo "ANTHROPIC_API_KEY: not set (simulated AI)"
+    [[ -n "${LD_FLAG_TRIGGER_URL:-}" ]] && echo "LD_FLAG_TRIGGER_URL: set (./run.sh remediate)" || echo "LD_FLAG_TRIGGER_URL: not set"
     ;;
   web)
     need_key
@@ -44,8 +45,28 @@ case "${1:-help}" in
     run CheckoutService
     ;;
   flags)       need_key; run FeatureFlagDemo ;;
-  experiment)  need_key; run TrafficSimulator "--minutes=${2:-30}" ;;
+  experiment)  need_key; run TrafficSimulator "--minutes=${2:-30} --users=${3:-5000}" ;;
   guarded)     need_key; run TrafficSimulator "--flag=new-payment-service --bad --minutes=${2:-30}" ;;
+  remediate)
+    # Part 1 remediate: POST the LaunchDarkly generic "turn off" trigger URL for new-checkout-flow.
+    # Create the trigger in LD UI (or API), copy the secret URL into .env as LD_FLAG_TRIGGER_URL.
+    # Never commit the URL.
+    if [[ -z "${LD_FLAG_TRIGGER_URL:-}" ]]; then
+      echo "LD_FLAG_TRIGGER_URL is not set." >&2
+      echo "In LaunchDarkly: open flag new-checkout-flow → environment configuration →" >&2
+      echo "Add trigger → Generic → Turn flag off → copy the URL into .env as LD_FLAG_TRIGGER_URL." >&2
+      exit 1
+    fi
+    echo "Posting generic turn-off trigger for new-checkout-flow..."
+    # Do not echo the URL (it is a secret).
+    code="$(curl -sS -o /tmp/ld-remediate-body.txt -w "%{http_code}" -X POST "$LD_FLAG_TRIGGER_URL" || true)"
+    if [[ "$code" =~ ^2 ]]; then
+      echo "OK (HTTP $code). new-checkout-flow targeting should now be Off."
+    else
+      echo "Trigger request failed (HTTP ${code:-curl-error}). Check the URL is still valid in the LD UI." >&2
+      exit 1
+    fi
+    ;;
   ai)          need_key; run AiConfigDemo ;;
   booking)
     need_key
@@ -66,8 +87,9 @@ Usage: ./run.sh <command>
   build              Compile the project
   web                Web front end at http://localhost:8080
   flags              Feature flag demo (multi-context targeting, live change)
-  experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min)
+  experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min, 5000 users)
   guarded [min]      Bad-release traffic for the guarded rollout on new-payment-service
+  remediate          POST LD_FLAG_TRIGGER_URL to turn off new-checkout-flow (flag trigger)
   ai                 AI Config demo with kill switch
   booking [parent]   Agent booking helper (amelia or liam). Add --confirm to book.
   demo               Interview run: flags, then AI

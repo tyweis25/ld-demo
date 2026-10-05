@@ -15,12 +15,15 @@ import java.util.Scanner;
  * Uses MULTI-CONTEXTS (user + organization) so targeting can happen at the account level:
  * everyone at an enterprise customer gets the new flow together, regardless of their own role.
  *
- * Recreate this boolean flag in your LaunchDarkly project: new-checkout-flow
- * Part 2: individual-target user-harper; rule-target organization.tier = enterprise.
+ * Create this boolean flag in your LaunchDarkly project: new-checkout-flow
+ * Put your server-side SDK key in LD_SDK_KEY (.env).
+ * Part 2: individual-target user-harper and/or user-liam; rule-target organization.tier = enterprise.
+ * Individual targets are evaluated before rules — Liam can get true even when a free-tier rule would deny it.
  * Run: export LD_SDK_KEY=sdk-xxxx && mvn -q compile exec:java
  */
 public class FeatureFlagDemo {
 
+    /** Create boolean flag new-checkout-flow in LaunchDarkly. */
     private static final String FLAG_KEY = "new-checkout-flow";
     static final ContextKind ORGANIZATION = ContextKind.of("organization");
 

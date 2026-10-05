@@ -13,15 +13,15 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 | Requirement | Where it is implemented | How to run it |
 |---|---|---|
 | **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form: classic three-step vs one-page (`CheckoutService`, `index.html`). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
-| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`). The page polls `/api/checkout` every 2 seconds and swaps the form **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
-| **Part 1 — Remediate** | Kill switch `ai-assistant-enabled`. The **Turn Off AI Assistant** button (or curl) PATCHes the flag off through the REST API. | Button on the page, or `curl -X POST -H 'X-LD-Demo: 1' 'http://127.0.0.1:8080/api/killswitch?state=off'` |
+| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The form swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
+| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` POSTs it. AI kill switch `ai-assistant-enabled` remains for the assistant REST toggle. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
-| **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH`. | Select Harper. |
-| **Part 2 — Rule-based targeting** | Rule: **organization** `tier` is one of `enterprise` → `true`. Inspector reason: `RULE_MATCH`. | Select Amelia. Liam (`free`) gets the default (`false`). |
+| **Part 2 — Individual targeting** | Target user keys `user-harper` and `user-liam` to serve `true`. Individual targets are evaluated **before** rules, so Liam can get the new flow even when a free-tier rule would deny it. Inspector reason: `TARGET_MATCH`. | Select Harper or Liam. |
+| **Part 2 — Rule-based targeting** | Rule: **organization** `tier` is one of `enterprise` → `true`. Inspector reason: `RULE_MATCH`. | Select Amelia. |
 | **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
 | **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
-| **Extra credit — Integrations** | LaunchDarkly hosted MCP (`.cursor/mcp.json`) and agent skills under `.agents/skills` (used with Cursor). | Open the project in Cursor with the LaunchDarkly MCP connected. |
+| **Extra credit — Integrations** | (1) LaunchDarkly hosted MCP + agent skills (`.cursor/mcp.json`, `.agents/skills`) for Cursor. (2) Flag trigger remediate (`LD_FLAG_TRIGGER_URL` + `./run.sh remediate`). | Connect MCP in Cursor; run `./run.sh remediate` after setting the trigger URL. |
 
 The web app is the main surface: `./run.sh web` then open [http://localhost:8080](http://localhost:8080).
 
@@ -79,9 +79,10 @@ HTML is loaded once at Java startup (`CheckoutService.loadPage()`). After you ed
 |---|---|---|
 | `LD_SDK_KEY` | Yes | Server-side SDK. Reads flags and AI configs |
 | `ANTHROPIC_API_KEY` | No | Live Claude calls. Simulated replies if unset |
-| `LD_API_TOKEN` | No | Makes the kill-switch button work (REST, not the SDK) |
+| `LD_API_TOKEN` | No | Makes the AI kill-switch button work (REST, not the SDK) |
 | `LD_PROJECT_KEY` | With token | Usually `default` |
 | `LD_ENV_KEY` | With token | Must match the SDK key’s environment (`test`, `production`, …) |
+| `LD_FLAG_TRIGGER_URL` | No | Secret URL for the generic **turn off** trigger on `new-checkout-flow`. Used by `./run.sh remediate`. Never commit |
 | `LD_API_BASE` | No | EU accounts: `https://app.eu.launchdarkly.com` |
 | `PORT` | No | Java HTTP port, default `8080` |
 | `HOST` | No | Bind address, default `127.0.0.1` |
@@ -90,7 +91,7 @@ HTML is loaded once at Java startup (`CheckoutService.loadPage()`). After you ed
 | `BOOKING_PORT` | No | Sidecar port, default `8081` |
 | `BOOKING_HELPER_URL` | Set by `run.sh web` | `http://127.0.0.1:${BOOKING_PORT}` |
 
-`LD_API_TOKEN` is not an SDK key. The SDK key can only read. The token can change targeting. Use the narrowest role you can.
+`LD_API_TOKEN` and `LD_FLAG_TRIGGER_URL` are secrets. The SDK key can only read. Keep them in `.env` and never commit them.
 
 ## How the SDKs are pulled in
 
@@ -135,7 +136,7 @@ Every evaluation is a **user + organization** multi-context. Account-level rules
 | Harper Reed | `user-harper` | parent | same org as Amelia | enterprise |
 | Liam Carter | `user-liam` | parent | `org-bright` Parkside Parents Co-op | free |
 
-Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **rule** (`RULE_MATCH`), Harper is an **individual target** (`TARGET_MATCH`), Liam hits the default rule (`FALLTHROUGH`). The inspector prints that reason.
+Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **rule** (`RULE_MATCH`), Harper and Liam are **individual targets** (`TARGET_MATCH`). Individual targeting is evaluated before rules, so Liam (`free` org) still gets the new one-page flow when listed as an individual target even if a free-tier rule would otherwise serve classic. The inspector prints that reason.
 
 ## LaunchDarkly objects the code expects
 
@@ -145,12 +146,22 @@ Recreate these in your trial project if they are not already there. The code key
 
 **`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
 
-1. **Individual targeting:** add user `user-harper` to serve `true`.
+1. **Individual targeting:** add user keys `user-harper` and `user-liam` to serve `true`. Individual targets beat rules.
 2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true`.
-3. Default rule: `false`.
-4. Targeting On.
+3. Optional free-tier rule → `false` (so Liam without an individual target would get classic).
+4. Default rule: `false` (or your experiment split).
+5. Targeting On.
 
-Amelia (enterprise, not individually listed) gets the one-page checkout via the rule. Harper gets it because she is named. Liam (`org-bright` / free) gets classic.
+Amelia (enterprise) gets the one-page checkout via the rule. Harper and Liam get it because they are named as individual targets.
+
+**Flag trigger (Part 1 remediate)**
+
+1. Open `new-checkout-flow` → environment overflow → **Configuration in environment**.
+2. **Add trigger** → **Generic** → action **Turn flag off**.
+3. Copy the secret URL into `.env` as `LD_FLAG_TRIGGER_URL` (never commit it).
+4. Run `./run.sh remediate` to POST the URL and turn targeting Off.
+
+The AI assistant button still uses REST (`LD_API_TOKEN`) against `ai-assistant-enabled`. That is separate from the checkout flag trigger.
 
 **`new-payment-service`** (boolean, optional guarded-rollout beyond the lab)
 
@@ -243,8 +254,9 @@ The sidecar stays up for the life of `./run.sh web`. It does not book on a timer
 | `build` | `mvn clean compile` |
 | `web` | Sidecar on 8081 + page on 8080 |
 | `flags` | Console multi-context demo |
-| `experiment [min]` | Traffic for `new-checkout-flow` (default 30) |
+| `experiment [min]` | Traffic for `new-checkout-flow` (default 30 min, 5000 users) |
 | `guarded [min]` | Bad-release traffic for `new-payment-service` |
+| `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-checkout-flow` |
 | `ai` | Console AI Config + kill switch |
 | `booking [parent]` | One-shot booking helper (`amelia` or `liam`). Add `--confirm` to book |
 | `demo` | `flags` then `ai` |
@@ -266,7 +278,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 - **Booking As** switches Amelia / Harper / Liam. The layout, assistant variation, and booking tools change with that context.
 - **Classic booking** (flag off): Address → Payment → Review.
 - **One-page booking** (flag on): all three on one page.
-- The page polls `/api/checkout` every 2 seconds. Flip a flag in the dashboard and the UI swaps without a refresh.
+- The page opens an **SSE** connection to `/api/events`. When the SDK sees a flag change, the UI refreshes immediately. A 10s poll remains as fallback.
 - **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
 - **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set. Otherwise the button is disabled and you flip the flag in the dashboard.
 - **Find Sitters / Confirm Booking** go through Java to the Python sidecar.
@@ -278,6 +290,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 | GET | `/` | Cached `index.html` |
 | GET | `/api/config` | Kill-switch capability, judge key, live model, sidecar present |
 | GET | `/api/checkout` | Flag + assistant state + reason for this shopper |
+| GET | `/api/events` | SSE stream of `flag-change` events from the SDK |
 | POST | `/api/order` | `checkout-completed` + `checkout-revenue` |
 | POST | `/api/assistant` | Kill switch + completion + judge |
 | GET | `/api/booking-status` | Proxy to sidecar `GET /status` |
@@ -321,12 +334,12 @@ JUnit covers context shape, checkout query parsing, kill-switch / booking HTML m
 
 ## Notes
 
-- **Guarded rollouts** are an Enterprise + Guardian add-on. Trials include a limited number.
-- Shoppers and traffic in this sample are simulated. Each simulated user is a context against your MAU. Default pool is 3,000. Lower `--users` if the trial is tight.
+- **Assumptions:** macOS or Linux, JDK 11+, Maven, Python 3, a LaunchDarkly trial (or paid) project with a server-side SDK key. Guarded rollouts need Enterprise + Guardian (trials often include a limited allotment).
+- Shoppers and traffic in this sample are simulated. Each simulated user is a context against your MAU. Default experiment pool is 5,000 (`./run.sh experiment`). Lower `--users` if the trial is tight.
 - The **Java AI SDK is pre-1.0**. Model name and messages are read by reflection so a renamed getter does not break the build.
 - **Judges do not auto-run** from the UI attachment. The app calls `judgeConfig`.
 - **AI model names** in the config go to Anthropic as-is.
 - **Fails closed.** Flags default `false`. If LaunchDarkly is down, new checkout and the assistant stay off.
-- **Kill-switch token** can change a real flag. Keep it in `.env` and never commit it.
+- **Secrets** (`LD_SDK_KEY`, `LD_API_TOKEN`, `LD_FLAG_TRIGGER_URL`, `ANTHROPIC_API_KEY`) stay in `.env` and are never committed.
 - Card numbers on the page are fake. No real payments.
 - Shopper `plan` / `tier` are sent from the browser for this sample. A production service would look those up server-side.

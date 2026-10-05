@@ -25,7 +25,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Amelia's Babysitting Service as a small web app: a front end plus the API behind it.
@@ -33,6 +38,7 @@ import java.util.concurrent.Executors;
  *   GET  /                 the checkout page (src/main/resources/web/index.html)
  *   GET  /api/config       what this server can do (for example, whether the kill switch button works)
  *   GET  /api/checkout     which checkout flow, and is the AI assistant on, for this shopper?
+ *   GET  /api/events       Server-Sent Events: SDK flag changes push to the browser instantly
  *   POST /api/order        place an order, sending events to LaunchDarkly
  *   POST /api/assistant    ask the AI assistant (kill switch + AI Config + model call)
  *   GET  /api/booking-status  which booking-helper variation this shopper gets (Python sidecar)
@@ -44,13 +50,21 @@ import java.util.concurrent.Executors;
  * with the server-side SDK and returns only the results.
  *
  * Config (environment variables):
- *   LD_SDK_KEY                required; replace with your server-side SDK key in .env
- *   FLAG_KEY                  optional; recreate boolean flag new-checkout-flow in your project
+ *   LD_SDK_KEY                required — put your server-side SDK key in .env (never commit .env)
+ *   FLAG_KEY                  optional; default flag key is new-checkout-flow (create that boolean flag)
  *   ANTHROPIC_API_KEY         optional, makes the assistant call a real model
  *   LD_API_TOKEN, LD_PROJECT_KEY, LD_ENV_KEY
- *                             optional, together they enable the kill switch button
+ *                             optional, together they enable the AI kill switch button
+ *   LD_FLAG_TRIGGER_URL       optional; used by ./run.sh remediate (generic turn-off trigger URL)
  *   LD_API_BASE               optional, defaults to https://app.launchdarkly.com (EU: https://app.eu.launchdarkly.com)
  *   APP_VERSION, PORT, HOST   HOST defaults to 127.0.0.1 so only this machine can reach it
+ *
+ * Flags / configs this app expects you to create in LaunchDarkly:
+ *   new-checkout-flow       — booking layout (classic vs one-page); Part 1 + Part 2 targeting
+ *   ai-assistant-enabled    — kill switch for the support assistant
+ *   support-assistant       — AI Config (completion) for Ask
+ *   babysitting-service-reply-accuracy — accuracy judge (optional)
+ *   booking-helper          — AI Config (agent) evaluated by the Python sidecar
  *
  * Run: ./run.sh web   then open http://localhost:8080
  */
@@ -58,13 +72,17 @@ public class CheckoutService {
 
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private static final String JSON = "application/json";
+    /** Open SSE clients. Each queue receives already-formatted SSE frames. */
+    private static final Set<BlockingQueue<String>> SSE_CLIENTS = ConcurrentHashMap.newKeySet();
 
     public static void main(String[] args) throws Exception {
+        // LD_SDK_KEY: server-side SDK key from Project settings → Environments. Put it in .env only.
         String sdkKey = env("LD_SDK_KEY");
         if (sdkKey.isEmpty()) {
             System.err.println("Missing LD_SDK_KEY.");
             System.exit(1);
         }
+        // Create boolean flag new-checkout-flow in LaunchDarkly (or override with FLAG_KEY).
         String flagKey = System.getenv().getOrDefault("FLAG_KEY", "new-checkout-flow");
         String version = System.getenv().getOrDefault("APP_VERSION", "1.0.0");
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
@@ -86,12 +104,15 @@ public class CheckoutService {
         System.out.println("LaunchDarkly client initialized: " + client.isInitialized());
         LDAIClient aiClient = new LDAIClientImpl(client);
 
-        // Watch releases happen in the terminal, with no redeploy and no restart.
-        client.getFlagTracker().addFlagChangeListener(event ->
-                System.out.println("Flag changed in LaunchDarkly: " + event.getKey()));
+        // Stream flag updates from LaunchDarkly → terminal + every open browser SSE connection.
+        client.getFlagTracker().addFlagChangeListener(event -> {
+            System.out.println("Flag changed in LaunchDarkly: " + event.getKey());
+            publishSse("flag-change", "{\"key\":\"" + jsonEscape(event.getKey()) + "\"}");
+        });
 
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getByName(host), port), 0);
-        server.setExecutor(Executors.newFixedThreadPool(8));
+        // Enough threads for page/API work plus long-lived SSE listeners.
+        server.setExecutor(Executors.newCachedThreadPool());
 
         server.createContext("/", ex -> {
             String path = ex.getRequestURI().getPath();
@@ -118,8 +139,9 @@ public class CheckoutService {
         server.createContext("/api/checkout", ex -> {
             if (!ex.getRequestMethod().equals("GET")) { send(ex, 405, JSON, "{\"error\":\"use GET\"}"); return; }
             LDContext ctx = contextFrom(query(ex.getRequestURI().getRawQuery()));
+            // Flag key: new-checkout-flow (create this boolean flag in your LD project).
             EvaluationDetail<Boolean> d = client.boolVariationDetail(flagKey, ctx, false);
-            // The kill switch defaults to false: if LaunchDarkly is unreachable, the assistant stays off.
+            // Kill switch: ai-assistant-enabled (create this boolean flag; defaults false / fails closed).
             boolean assistantOn = client.boolVariation(AiAssistant.KILL_SWITCH_FLAG, ctx, false);
             send(ex, 200, JSON, LDValue.buildObject()
                     .put("app_version", version)
@@ -130,6 +152,34 @@ public class CheckoutService {
                     .put("reason", String.valueOf(d.getReason()))
                     .put("assistant_enabled", assistantOn)
                     .build().toJsonString());
+        });
+
+        // Instant UI updates: SDK flag-change listener → SSE → browser poll of /api/checkout.
+        server.createContext("/api/events", ex -> {
+            if (!ex.getRequestMethod().equals("GET")) { send(ex, 405, JSON, "{\"error\":\"use GET\"}"); return; }
+            ex.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
+            ex.getResponseHeaders().set("Cache-Control", "no-cache");
+            ex.getResponseHeaders().set("Connection", "keep-alive");
+            ex.sendResponseHeaders(200, 0);
+            BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+            SSE_CLIENTS.add(queue);
+            try (OutputStream os = ex.getResponseBody()) {
+                os.write(": connected\n\n".getBytes(StandardCharsets.UTF_8));
+                os.flush();
+                while (!Thread.currentThread().isInterrupted()) {
+                    String frame = queue.poll(15, TimeUnit.SECONDS);
+                    if (frame == null) {
+                        os.write(": keepalive\n\n".getBytes(StandardCharsets.UTF_8));
+                    } else {
+                        os.write(frame.getBytes(StandardCharsets.UTF_8));
+                    }
+                    os.flush();
+                }
+            } catch (IOException | InterruptedException ignored) {
+                // Client navigated away or the server is shutting down.
+            } finally {
+                SSE_CLIENTS.remove(queue);
+            }
         });
 
         server.createContext("/api/order", ex -> {
@@ -223,9 +273,23 @@ public class CheckoutService {
         System.out.println("AI assistant model calls: " + (anthropicKey.isEmpty() ? "SIMULATED" : "LIVE (Anthropic)"));
         System.out.println("Kill switch button: " + (canToggle ? "enabled" : "disabled (no LD_API_TOKEN / LD_PROJECT_KEY / LD_ENV_KEY)"));
         System.out.println("Booking agent sidecar: " + (bookingHelperUrl.isEmpty() ? "not configured" : bookingHelperUrl));
+        System.out.println("Flag-change SSE: GET /api/events");
     }
 
     // ---------------------------------------------------------------------------------------------
+
+    /** Fan out an SSE event frame to every open browser connection. */
+    static void publishSse(String event, String dataJson) {
+        String frame = "event: " + event + "\ndata: " + dataJson + "\n\n";
+        for (BlockingQueue<String> q : SSE_CLIENTS) {
+            q.offer(frame);
+        }
+    }
+
+    static String jsonEscape(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
 
     /** Turns the kill switch flag's targeting on or off with LaunchDarkly's REST API (semantic patch). */
     private static String setKillSwitch(String apiBase, String token, String project, String env, boolean on) {

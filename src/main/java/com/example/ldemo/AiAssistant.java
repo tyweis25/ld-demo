@@ -32,9 +32,9 @@ import java.util.Map;
  * The AI support assistant, shared by the console demo (AiConfigDemo) and the web app (CheckoutService).
  *
  * Two LaunchDarkly controls wrap every question:
- *   1. The KILL SWITCH flag (ai-assistant-enabled). Off means no AI call happens at all.
- *   2. The AI CONFIG (support-assistant). LaunchDarkly picks the model, prompt, and parameters per shopper.
- *   3. The ACCURACY JUDGE (babysitting-service-reply-accuracy). After a reply, LaunchDarkly serves the judge config and
+ *   1. The KILL SWITCH flag (ai-assistant-enabled). Create this boolean flag; Off means no AI call happens at all.
+ *   2. The AI CONFIG (support-assistant). Create this completion-mode AI Config. LaunchDarkly picks the model, prompt, and parameters per shopper.
+ *   3. The ACCURACY JUDGE (babysitting-service-reply-accuracy). Create this judge-mode config. After a reply, LaunchDarkly serves the judge config and
  *      this class scores the Q&A. The Java AI SDK does not run UI-attached judges by itself.
  *
  * NOTE: the Java AI SDK is pre-1.0. The model name and messages are read by reflection (see the helpers
@@ -42,8 +42,11 @@ import java.util.Map;
  */
 final class AiAssistant {
 
+    /** Create this completion AI Config in LaunchDarkly. */
     static final String CONFIG_KEY = "support-assistant";
+    /** Create this judge AI Config in LaunchDarkly (optional accuracy card). */
     static final String JUDGE_KEY = "babysitting-service-reply-accuracy";
+    /** Create this boolean kill-switch flag in LaunchDarkly. */
     static final String KILL_SWITCH_FLAG = "ai-assistant-enabled";
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
