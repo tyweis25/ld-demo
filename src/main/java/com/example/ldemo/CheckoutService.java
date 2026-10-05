@@ -275,7 +275,7 @@ public class CheckoutService {
                         .build().toJsonString());
                 return;
             }
-            send(ex, 200, JSON, postFlagTrigger(flagTriggerUrl));
+            send(ex, 200, JSON, postFlagTrigger(flagTriggerUrl, flagKey));
         });
 
         // Flush events and close cleanly on Ctrl+C or SIGTERM.
@@ -311,8 +311,9 @@ public class CheckoutService {
     /**
      * POSTs the secret LaunchDarkly generic flag-trigger URL (turn off new-checkout-flow).
      * The URL itself is never returned to the client.
+     * Also nudges open SSE clients so the page re-polls even before the SDK stream lands.
      */
-    static String postFlagTrigger(String triggerUrl) {
+    static String postFlagTrigger(String triggerUrl, String flagKey) {
         try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(triggerUrl))
                     .timeout(Duration.ofSeconds(15))
@@ -322,6 +323,8 @@ public class CheckoutService {
             int code = response.statusCode();
             if (code >= 200 && code < 300) {
                 System.out.println("Remediate: posted flag trigger (HTTP " + code + "). new-checkout-flow should turn Off.");
+                // Wake browsers immediately; the real flag-change from the SDK usually follows within a second.
+                publishSse("flag-change", "{\"key\":\"" + jsonEscape(flagKey) + "\",\"source\":\"remediate\"}");
                 return LDValue.buildObject().put("ok", true).put("http_status", code).build().toJsonString();
             }
             System.out.println("Remediate: flag trigger returned HTTP " + code);

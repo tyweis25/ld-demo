@@ -516,7 +516,7 @@
   const planName = (tier) => String(tier || "").replace(/^./, (c) => c.toUpperCase());
 
   const state = {
-    shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, toastTimer: null,
+    shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, pollAgain: false, toastTimer: null,
     config: { can_toggle: false, can_remediate: false, assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
     assistantEnabled: null, answer: null, asking: false, ksBusy: false, remediateBusy: false,
     booking: null, bookingReply: null, bookingAsking: false
@@ -872,15 +872,43 @@
     try {
       const res = await post("/api/remediate");
       const data = await res.json();
-      if (!data.ok) toast(data.error || "Remediate didn't complete.");
-      else toast("Remediate posted. Waiting for LaunchDarkly to turn the flag off…");
-      setTimeout(poll, 500);
+      if (!data.ok) {
+        toast(data.error || "Remediate didn't complete.");
+        return;
+      }
+      toast("Remediate posted. Switching to classic UI…");
+      // Don't rely on a single poll: SDK stream + SSE can race; retry until classic.
+      await waitForEnabled(false, 2500);
+      if (state.enabled === false) {
+        toast(`Remediated to classic UI for ${first(state.shopper.name)} (new-checkout-flow off).`);
+      } else {
+        toast("Flag trigger posted, but the UI hasn't flipped yet. It should update within a couple of seconds.");
+        refreshAfterFlagChange();
+      }
     } catch (err) {
       toast("Couldn't reach the service. Check that it's running, then try again.");
     } finally {
       state.remediateBusy = false;
       if (state.enabled) renderCheckout(false);
     }
+  }
+
+  /** Staggered re-polls so a flag-change is not lost to an in-flight request or a slightly stale SDK read. */
+  function refreshAfterFlagChange() {
+    poll();
+    setTimeout(poll, 250);
+    setTimeout(poll, 700);
+    setTimeout(poll, 1400);
+  }
+
+  async function waitForEnabled(want, maxMs) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      await poll();
+      if (state.enabled === want) return true;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return state.enabled === want;
   }
 
   // ---------- Checkout views ----------
@@ -996,54 +1024,67 @@
   function setOffline(off) { $("#offline").hidden = !off; }
 
   async function poll() {
-    if (state.inflight || document.hidden) return;
-    state.inflight = true;
-    const shopper = state.shopper;
-    let stale = false;
-    try {
-      const res = await fetch("/api/checkout?" + params(shopper), { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (shopper !== state.shopper) { stale = true; return; }   // shopper changed mid-request
-      setOffline(false);
-      markChecked();
-
-      const previous = state.enabled;
-      const prevAssistant = state.assistantEnabled;
-      state.data = data;
-      state.enabled = data.enabled;
-      state.assistantEnabled = data.assistant_enabled;
-      applyExperience(!!data.enabled);
-
-      renderInspector();
-      refreshBooking();
-
-      if (prevAssistant === null) {
-        renderAssistant();
-      } else if (prevAssistant !== data.assistant_enabled) {
-        state.answer = null;
-        renderAssistant();
-        toast(data.assistant_enabled
-          ? `The AI assistant is back on for ${first(state.shopper.name)}.`
-          : `The AI assistant was turned off for ${first(state.shopper.name)}. One switch, no redeploy.`);
-      }
-
-      if (previous === null) {
-        renderCheckout(false);
-      } else if (previous !== data.enabled) {
-        state.step = 0;
-        state.placed = null;
-        renderCheckout(true);
-        toast(data.enabled
-          ? `Harbor Dusk UI is live for ${first(state.shopper.name)} (new-checkout-flow on).`
-          : `Remediated to classic UI for ${first(state.shopper.name)} (new-checkout-flow off).`);
-      }
-    } catch (err) {
-      setOffline(true);
-    } finally {
-      state.inflight = false;
-      if (stale) poll();
+    // Never drop a flag-change refresh: if a request is already in flight, queue another pass.
+    if (state.inflight) {
+      state.pollAgain = true;
+      return state._pollPromise || Promise.resolve();
     }
+    state.inflight = true;
+    state._pollPromise = (async () => {
+      const shopper = state.shopper;
+      let stale = false;
+      try {
+        const res = await fetch("/api/checkout?" + params(shopper), { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (shopper !== state.shopper) { stale = true; return; }   // shopper changed mid-request
+        setOffline(false);
+        markChecked();
+
+        const previous = state.enabled;
+        const prevAssistant = state.assistantEnabled;
+        state.data = data;
+        state.enabled = data.enabled;
+        state.assistantEnabled = data.assistant_enabled;
+        applyExperience(!!data.enabled);
+
+        renderInspector();
+        refreshBooking();
+
+        if (prevAssistant === null) {
+          renderAssistant();
+        } else if (prevAssistant !== data.assistant_enabled) {
+          state.answer = null;
+          renderAssistant();
+          toast(data.assistant_enabled
+            ? `The AI assistant is back on for ${first(state.shopper.name)}.`
+            : `The AI assistant was turned off for ${first(state.shopper.name)}. One switch, no redeploy.`);
+        }
+
+        if (previous === null) {
+          renderCheckout(false);
+        } else if (previous !== data.enabled) {
+          state.step = 0;
+          state.placed = null;
+          renderCheckout(true);
+          // Skip toast if remediateToClassic will announce the flip.
+          if (!state.remediateBusy) {
+            toast(data.enabled
+              ? `Harbor Dusk UI is live for ${first(state.shopper.name)} (new-checkout-flow on).`
+              : `Remediated to classic UI for ${first(state.shopper.name)} (new-checkout-flow off).`);
+          }
+        }
+      } catch (err) {
+        setOffline(true);
+      } finally {
+        state.inflight = false;
+        const again = state.pollAgain || stale;
+        state.pollAgain = false;
+        state._pollPromise = null;
+        if (again) await poll();
+      }
+    })();
+    return state._pollPromise;
   }
 
   async function placeOrder(button) {
@@ -1115,11 +1156,11 @@
   });
 
   // Instant updates via Server-Sent Events (SDK flag-change listener → /api/events).
-  // Polling remains a slow fallback if the SSE connection drops.
+  // Polling remains a fallback if the SSE connection drops.
   function connectEvents() {
     try {
       const es = new EventSource("/api/events");
-      es.addEventListener("flag-change", () => { poll(); });
+      es.addEventListener("flag-change", () => { refreshAfterFlagChange(); });
       es.onerror = () => { /* EventSource reconnects automatically */ };
     } catch (err) {
       // Older browsers: polling alone is enough.
@@ -1133,11 +1174,12 @@
   fetch("/api/config").then((r) => r.json()).then((cfg) => {
     state.config = cfg;
     renderAssistant();
+    if (state.enabled) renderCheckout(false);
     if (state.data) renderInspector();
   }).catch(() => {});
   connectEvents();
   poll();
-  setInterval(poll, 10000);
+  setInterval(poll, 3000);
 })();
 </script>
 </body>
