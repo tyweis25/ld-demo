@@ -97,6 +97,9 @@ public class CheckoutService {
         String apiBase = System.getenv().getOrDefault("LD_API_BASE", "https://app.launchdarkly.com");
         boolean canToggle = !apiToken.isEmpty() && projectKey.matches("[A-Za-z0-9._-]+") && !envKey.isEmpty();
         String bookingHelperUrl = env("BOOKING_HELPER_URL");
+        // Secret generic turn-off trigger URL for new-checkout-flow. Never send this to the browser.
+        String flagTriggerUrl = env("LD_FLAG_TRIGGER_URL");
+        boolean canRemediate = flagTriggerUrl.startsWith("https://");
 
         byte[] page = loadPage();
 
@@ -130,6 +133,7 @@ public class CheckoutService {
 
         server.createContext("/api/config", ex -> send(ex, 200, JSON, LDValue.buildObject()
                 .put("can_toggle", canToggle)
+                .put("can_remediate", canRemediate)
                 .put("assistant_flag", AiAssistant.KILL_SWITCH_FLAG)
                 .put("judge_key", AiAssistant.JUDGE_KEY)
                 .put("live_model", !anthropicKey.isEmpty())
@@ -262,6 +266,18 @@ public class CheckoutService {
             send(ex, 200, JSON, setKillSwitch(apiBase, apiToken, projectKey, envKey, state.equals("on")));
         });
 
+        // Part 1 remediate: POST the LaunchDarkly flag trigger URL server-side (never expose it to the browser).
+        server.createContext("/api/remediate", ex -> {
+            if (!requirePost(ex)) return;
+            if (!canRemediate) {
+                send(ex, 400, JSON, LDValue.buildObject().put("ok", false)
+                        .put("error", "Remediate isn't set up. Add LD_FLAG_TRIGGER_URL to .env (generic turn-off trigger on new-checkout-flow), or run ./run.sh remediate.")
+                        .build().toJsonString());
+                return;
+            }
+            send(ex, 200, JSON, postFlagTrigger(flagTriggerUrl));
+        });
+
         // Flush events and close cleanly on Ctrl+C or SIGTERM.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             server.stop(1);
@@ -272,6 +288,7 @@ public class CheckoutService {
         System.out.printf("Amelia's Babysitting Service %s is running at http://localhost:%d (flag: %s)%n", version, port, flagKey);
         System.out.println("AI assistant model calls: " + (anthropicKey.isEmpty() ? "SIMULATED" : "LIVE (Anthropic)"));
         System.out.println("Kill switch button: " + (canToggle ? "enabled" : "disabled (no LD_API_TOKEN / LD_PROJECT_KEY / LD_ENV_KEY)"));
+        System.out.println("Remediate (flag trigger): " + (canRemediate ? "enabled" : "disabled (no LD_FLAG_TRIGGER_URL)"));
         System.out.println("Booking agent sidecar: " + (bookingHelperUrl.isEmpty() ? "not configured" : bookingHelperUrl));
         System.out.println("Flag-change SSE: GET /api/events");
     }
@@ -289,6 +306,36 @@ public class CheckoutService {
     static String jsonEscape(String s) {
         if (s == null) return "";
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    /**
+     * POSTs the secret LaunchDarkly generic flag-trigger URL (turn off new-checkout-flow).
+     * The URL itself is never returned to the client.
+     */
+    static String postFlagTrigger(String triggerUrl) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(triggerUrl))
+                    .timeout(Duration.ofSeconds(15))
+                    .POST(HttpRequest.BodyPublishers.noBody())
+                    .build();
+            HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+            int code = response.statusCode();
+            if (code >= 200 && code < 300) {
+                System.out.println("Remediate: posted flag trigger (HTTP " + code + "). new-checkout-flow should turn Off.");
+                return LDValue.buildObject().put("ok", true).put("http_status", code).build().toJsonString();
+            }
+            System.out.println("Remediate: flag trigger returned HTTP " + code);
+            return LDValue.buildObject().put("ok", false)
+                    .put("error", "The flag trigger returned HTTP " + code + ". Check that LD_FLAG_TRIGGER_URL is still valid.")
+                    .build().toJsonString();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "{\"ok\":false,\"error\":\"The remediate request was interrupted.\"}";
+        } catch (IOException | RuntimeException e) {
+            return LDValue.buildObject().put("ok", false)
+                    .put("error", "Couldn't reach the LaunchDarkly flag trigger. Check your network and LD_FLAG_TRIGGER_URL.")
+                    .build().toJsonString();
+        }
     }
 
     /** Turns the kill switch flag's targeting on or off with LaunchDarkly's REST API (semantic patch). */

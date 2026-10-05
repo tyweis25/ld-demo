@@ -82,6 +82,9 @@ class CheckoutServiceTest {
         assertTrue(html.contains("/api/assistant"));
         assertTrue(html.contains("/api/events"));
         assertTrue(html.contains("EventSource"));
+        assertTrue(html.contains("data-action=\"remediate\""));
+        assertTrue(html.contains("neo-shell"));
+        assertTrue(html.contains("data-ui"));
         assertTrue(html.contains("X-LD-Demo"));
     }
 

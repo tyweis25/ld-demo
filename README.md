@@ -12,9 +12,9 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 
 | Requirement | Where it is implemented | How to run it |
 |---|---|---|
-| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form: classic three-step vs one-page (`CheckoutService`, `index.html`). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
-| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The form swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
-| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` POSTs it. AI kill switch `ai-assistant-enabled` remains for the assistant REST toggle. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` |
+| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form: **classic multi-step UI** (flag off) vs **Harbor Dusk express UI** (flag on). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
+| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The **entire look-and-feel** swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
+| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` or the discreet **Remediate** control on the new UI (`POST /api/remediate`) POSTs it. SSE flips the page back to classic. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` or click Remediate on the Harbor Dusk UI. |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
 | **Part 2 — Individual targeting** | Target user keys `user-harper` and `user-liam` to serve `true`. Individual targets are evaluated **before** rules, so Liam can get the new flow even when a free-tier rule would deny it. Inspector reason: `TARGET_MATCH`. | Select Harper or Liam. |
@@ -276,11 +276,12 @@ mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 The inspector at the top shows checkout variation, assistant on/off, booking-agent variation, latest accuracy score, and the evaluation reason.
 
 - **Booking As** switches Amelia / Harper / Liam. The layout, assistant variation, and booking tools change with that context.
-- **Classic booking** (flag off): Address → Payment → Review.
-- **One-page booking** (flag on): all three on one page.
+- **Classic UI** (`new-checkout-flow` off): Address → Payment → Review (lavender / Fraunces look).
+- **Harbor Dusk UI** (`new-checkout-flow` on): a visually distinct express booking sheet (teal dusk band, Literata/Sora, amber accent). Remediate / flag-off returns to classic.
 - The page opens an **SSE** connection to `/api/events`. When the SDK sees a flag change, the UI refreshes immediately. A 10s poll remains as fallback.
 - **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
 - **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set. Otherwise the button is disabled and you flip the flag in the dashboard.
+- **Remediate To Classic UI** (new experience only) POSTs `/api/remediate`, which curls `LD_FLAG_TRIGGER_URL` on the server. Same effect as `./run.sh remediate`.
 - **Find Sitters / Confirm Booking** go through Java to the Python sidecar.
 
 ### HTTP API
@@ -288,7 +289,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/` | Cached `index.html` |
-| GET | `/api/config` | Kill-switch capability, judge key, live model, sidecar present |
+| GET | `/api/config` | Kill-switch / remediate capability, judge key, live model, sidecar present |
 | GET | `/api/checkout` | Flag + assistant state + reason for this shopper |
 | GET | `/api/events` | SSE stream of `flag-change` events from the SDK |
 | POST | `/api/order` | `checkout-completed` + `checkout-revenue` |
@@ -296,6 +297,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 | GET | `/api/booking-status` | Proxy to sidecar `GET /status` |
 | POST | `/api/booking` | Proxy to sidecar `POST /ask` |
 | POST | `/api/killswitch?state=on\|off` | REST toggle of `ai-assistant-enabled` |
+| POST | `/api/remediate` | Server-side POST of `LD_FLAG_TRIGGER_URL` (turns `new-checkout-flow` off) |
 | GET | `/health`, `/ready` | Liveness / SDK initialized |
 
 POSTs require header `X-LD-Demo: 1` so a random website cannot drive the kill switch from your browser.

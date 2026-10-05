@@ -6,7 +6,7 @@
 <title>Amelia's Babysitting Service</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600;7..72,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #241C30;
@@ -233,10 +233,185 @@
   @media (prefers-reduced-motion: reduce) {
     .checkout.swap { animation: none; }
     .inspector::before { transition: none; }
+    body[data-ui="new"] .neo-shell { animation: none; }
+  }
+
+  /* ---- Flag-on experience: Harbor Dusk (visually distinct from classic) ---- */
+  body[data-ui="new"] {
+    --ink: #0E2F2A;
+    --paper: #D7E4E1;
+    --surface: #F3F7F5;
+    --wash: #E5EFEC;
+    --rule: #B7CBC5;
+    --muted: #4A6560;
+    --brand: #0E2F2A;
+    --signal: #1F7A5C;
+    --signal-tint: #D8F0E6;
+    --hold: #3D6B66;
+    --hold-tint: #D5E8E4;
+    --danger: #8B3A2F;
+    --danger-tint: #F3E2DE;
+    --focus: #C9862A;
+    --accent: #C9862A;
+    --dusk-a: #1A4A43;
+    --dusk-b: #0E2F2A;
+    --fog: #C5D8D4;
+    --display: "Literata", "Iowan Old Style", Georgia, serif;
+    --body: "Sora", "Segoe UI", system-ui, sans-serif;
+    --radius: 4px;
+    --shadow: 0 1px 0 rgba(14, 47, 42, 0.06);
+    background:
+      linear-gradient(180deg, #1A4A43 0px, #1A4A43 168px, transparent 168px),
+      radial-gradient(1200px 480px at 10% -5%, #2A6B61 0%, transparent 55%),
+      radial-gradient(900px 420px at 100% 8%, #C9862A33 0%, transparent 45%),
+      linear-gradient(180deg, var(--fog), var(--paper) 42%, #E8F0ED);
+    color: var(--ink);
+    font-family: var(--body);
+  }
+  body[data-ui="new"] .page { padding-top: 12px; }
+  body[data-ui="new"] .top {
+    border-bottom: 0; padding: 12px 0 28px; margin-bottom: 8px;
+    color: #F3F7F5;
+  }
+  body[data-ui="new"] .brand-name {
+    font: 700 28px/1.05 var(--display);
+    letter-spacing: -0.03em;
+    color: #F7FBF9;
+  }
+  body[data-ui="new"] .brand-sub {
+    color: #D5E8E4; letter-spacing: 0.14em; font-size: 11px;
+  }
+  body[data-ui="new"] .mark {
+    background: var(--accent); color: #0E2F2A; border-radius: 3px; width: 44px; height: 44px;
+  }
+  body[data-ui="new"] .who-label { color: #D5E8E4; }
+  body[data-ui="new"] .who-list {
+    background: rgba(243, 247, 245, 0.12); border-color: rgba(243, 247, 245, 0.28); border-radius: 3px;
+  }
+  body[data-ui="new"] .who-btn { border-right-color: rgba(243, 247, 245, 0.22); color: #F3F7F5; }
+  body[data-ui="new"] .who-btn span { color: #D5E8E4; }
+  body[data-ui="new"] .who-btn[aria-pressed="true"] {
+    background: var(--accent); color: #0E2F2A;
+  }
+  body[data-ui="new"] .who-btn[aria-pressed="true"] span { color: rgba(14, 47, 42, 0.72); }
+  body[data-ui="new"] .inspector {
+    background: rgba(243, 247, 245, 0.92); border-color: var(--rule); border-radius: 3px;
+    box-shadow: none; backdrop-filter: blur(6px);
+  }
+  body[data-ui="new"] .inspector::before { background: var(--accent); border-radius: 0; width: 3px; }
+  body[data-ui="new"] .inspector[data-on="true"]::before { background: var(--signal); }
+  body[data-ui="new"] .fact { border-radius: 3px; background: #fff; }
+  body[data-ui="new"] .pill { border-radius: 3px; }
+  body[data-ui="new"] .layout {
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 380px);
+    gap: 22px;
+  }
+  body[data-ui="new"] .panel,
+  body[data-ui="new"] .summary,
+  body[data-ui="new"] .assistant {
+    background: #fff; border-color: var(--rule); border-radius: 3px; box-shadow: none;
+  }
+  body[data-ui="new"] .btn {
+    background: var(--accent); color: #0E2F2A; border-radius: 3px; letter-spacing: 0.02em;
+  }
+  body[data-ui="new"] .btn:hover { background: #B57520; }
+  body[data-ui="new"] .btn-secondary {
+    background: transparent; border-color: var(--rule); color: var(--ink); border-radius: 3px;
+  }
+  body[data-ui="new"] .btn-secondary:hover { border-color: var(--accent); background: #FFF8EC; }
+  body[data-ui="new"] .field input,
+  body[data-ui="new"] .ask input,
+  body[data-ui="new"] .booking-ask input {
+    border-radius: 3px; background: #fff; border-color: var(--rule);
+  }
+  body[data-ui="new"] .field input:focus,
+  body[data-ui="new"] .ask input:focus,
+  body[data-ui="new"] .booking-ask input:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 134, 42, 0.22);
+  }
+  body[data-ui="new"] .choice { border-radius: 3px; background: #fff; }
+  body[data-ui="new"] .choice:has(input:checked) {
+    border-color: var(--accent); background: #FFF8EC;
+  }
+  body[data-ui="new"] .choice input { accent-color: var(--accent); }
+  body[data-ui="new"] .toast { background: var(--dusk-b); border-radius: 3px; }
+
+  .neo-shell { animation: swap .32s ease-out; }
+  .neo-hero {
+    margin: 0 0 18px; padding: 8px 0 4px; color: var(--ink);
+  }
+  .neo-kicker {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+  }
+  .neo-hero h1 {
+    font: 700 clamp(34px, 5vw, 48px)/1.05 var(--display);
+    letter-spacing: -0.035em; margin: 0 0 10px; max-width: 14ch;
+  }
+  .neo-hero .sub { margin: 0; max-width: 42ch; font-size: 15px; color: var(--muted); }
+  .neo-rail {
+    display: grid; gap: 0; background: #fff; border: 1px solid var(--rule); border-radius: 3px;
+  }
+  .neo-block {
+    padding: 22px 24px; border-bottom: 1px solid var(--rule);
+  }
+  .neo-block:last-of-type { border-bottom: 0; }
+  .neo-block h2 {
+    font: 600 15px/1.2 var(--body); letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 14px;
+  }
+  .neo-split {
+    display: grid; grid-template-columns: 1.2fr 0.9fr; gap: 0;
+  }
+  .neo-split .neo-block + .neo-block { border-left: 1px solid var(--rule); }
+  .neo-pay {
+    display: grid; gap: 8px;
+  }
+  .neo-pay label {
+    display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start;
+    padding: 12px 12px; border: 1px solid var(--rule); background: var(--wash); cursor: pointer;
+  }
+  .neo-pay label:has(input:checked) {
+    border-color: var(--accent); background: #FFF8EC;
+  }
+  .neo-pay input { margin-top: 2px; accent-color: var(--accent); }
+  .neo-pay b { display: block; font-size: 14px; font-weight: 600; font-style: normal; }
+  .neo-pay i { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; font-style: normal; }
+  .neo-review { display: grid; gap: 10px; }
+  .neo-review-row {
+    display: flex; justify-content: space-between; gap: 16px; font-size: 14px;
+    padding-bottom: 8px; border-bottom: 1px dashed var(--rule);
+  }
+  .neo-review-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .neo-review-row span:first-child { color: var(--muted); }
+  .neo-foot {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 18px 24px; background: var(--wash);
+  }
+  .neo-foot .btn { min-width: 180px; }
+  .neo-remediate {
+    display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  }
+  .btn-remediate {
+    background: transparent; color: var(--muted); border: 0; padding: 6px 0;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 36px;
+  }
+  .btn-remediate:hover { color: var(--danger); }
+  .btn-remediate[disabled] { opacity: .5; cursor: progress; text-decoration: none; }
+  .neo-remediate .hint { margin: 0; font-size: 11px; color: var(--muted); max-width: 28ch; }
+  body[data-ui="new"] .placed {
+    background: #fff; border: 1px solid var(--rule); padding: 28px 24px; border-radius: 3px;
+  }
+  body[data-ui="new"] .placed h1 { font: 700 40px/1.05 var(--display); letter-spacing: -0.03em; }
+  @media (max-width: 860px) {
+    .neo-split { grid-template-columns: 1fr; }
+    .neo-split .neo-block + .neo-block { border-left: 0; border-top: 1px solid var(--rule); }
+    body[data-ui="new"] .top { color: #F3F7F5; }
   }
 </style>
 </head>
-<body>
+<body data-ui="classic">
 <div class="page">
 
   <header class="top">
@@ -273,7 +448,7 @@
       <pre id="raw">Waiting For The First Response...</pre>
     </details>
     <div class="insp-foot">
-      <span>Updates Every 2 Seconds · v<span id="insp-version">—</span></span>
+      <span>Live Via SSE · Poll Fallback · v<span id="insp-version">—</span></span>
       <span id="checked"></span>
     </div>
   </section>
@@ -342,8 +517,8 @@
 
   const state = {
     shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, toastTimer: null,
-    config: { can_toggle: false, assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
-    assistantEnabled: null, answer: null, asking: false, ksBusy: false,
+    config: { can_toggle: false, can_remediate: false, assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
+    assistantEnabled: null, answer: null, asking: false, ksBusy: false, remediateBusy: false,
     booking: null, bookingReply: null, bookingAsking: false
   };
 
@@ -403,8 +578,8 @@
 
   function shortFlow(flow) {
     if (!flow) return "—";
-    if (String(flow).includes("one-page")) return "One-Page Booking";
-    if (String(flow).includes("classic")) return "Classic Booking";
+    if (String(flow).includes("one-page")) return "Harbor Dusk UI";
+    if (String(flow).includes("classic")) return "Classic UI";
     return flow;
   }
 
@@ -690,6 +865,24 @@
     }
   }
 
+  async function remediateToClassic() {
+    if (state.remediateBusy || !state.config.can_remediate) return;
+    state.remediateBusy = true;
+    renderCheckout(false);
+    try {
+      const res = await post("/api/remediate");
+      const data = await res.json();
+      if (!data.ok) toast(data.error || "Remediate didn't complete.");
+      else toast("Remediate posted. Waiting for LaunchDarkly to turn the flag off…");
+      setTimeout(poll, 500);
+    } catch (err) {
+      toast("Couldn't reach the service. Check that it's running, then try again.");
+    } finally {
+      state.remediateBusy = false;
+      if (state.enabled) renderCheckout(false);
+    }
+  }
+
   // ---------- Checkout views ----------
   const shippingFields = () => `
     <div class="fields">
@@ -729,19 +922,67 @@
   }
 
   function viewNew() {
-    return `<h1>Book A Sitter</h1><p class="sub">Address, Payment, And Review Are All On This Page.</p>
-      <section class="panel"><h2>Care Address</h2>${shippingFields()}</section>
-      <section class="panel"><h2>Payment</h2>${paymentFields()}</section>
-      <section class="panel"><h2>Review</h2>${reviewRows()}</section>
-      <div class="actions"><button class="btn" data-action="place">Book Session</button></div>`;
+    const canRemediate = !!state.config.can_remediate;
+    const remLabel = state.remediateBusy ? "Remediating…" : "Remediate To Classic UI";
+    const remHint = canRemediate
+      ? "Posts the LaunchDarkly flag trigger on the server. The secret URL never leaves .env."
+      : "Set LD_FLAG_TRIGGER_URL in .env, or run ./run.sh remediate.";
+    return `<div class="neo-shell">
+      <header class="neo-hero">
+        <p class="neo-kicker">Express Experience · Flag On</p>
+        <h1>Amelia's</h1>
+        <p class="sub">Harbor Dusk booking — one continuous sheet for care address, payment, and confirm. Flip the flag off (or remediate) to return to the classic multi-step UI.</p>
+      </header>
+      <div class="neo-rail">
+        <div class="neo-split">
+          <section class="neo-block">
+            <h2>Care Details</h2>
+            ${shippingFields()}
+          </section>
+          <section class="neo-block">
+            <h2>Payment</h2>
+            <div class="neo-pay">
+              <label><input type="radio" name="pay" checked><span><b>Visa Ending 4242</b><i>Expires 08/28</i></span></label>
+              <label><input type="radio" name="pay"><span><b>Family Account</b><i>Instant confirmation</i></span></label>
+            </div>
+          </section>
+        </div>
+        <section class="neo-block">
+          <h2>Review</h2>
+          <div class="neo-review">
+            <div class="neo-review-row"><span>Care At</span><span>${esc(state.shopper.name)}, 400 Main Street, Dallas 75201</span></div>
+            <div class="neo-review-row"><span>Payment</span><span>Visa Ending 4242</span></div>
+            <div class="neo-review-row"><span>Total</span><span>${money(TOTAL)}</span></div>
+          </div>
+        </section>
+        <div class="neo-foot">
+          <button class="btn" data-action="place">Confirm Evening Care</button>
+          <div class="neo-remediate">
+            <button type="button" class="btn-remediate" data-action="remediate" ${(!canRemediate || state.remediateBusy) ? "disabled" : ""}>${remLabel}</button>
+            <span class="hint">${remHint}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
   }
 
   function viewPlaced() {
     const p = state.placed;
+    const neo = state.enabled;
+    if (neo) {
+      return `<div class="placed neo-shell"><p class="neo-kicker">Booking Confirmed</p>
+        <h1>You're Set, ${esc(first(state.shopper.name))}.</h1>
+        <p>This booking used the ${esc(p.flow)}. LaunchDarkly received <b>checkout-completed</b> and ${money(p.amount)} of <b>checkout-revenue</b>.</p>
+        <div class="actions"><button class="btn" data-action="again">Book Another Evening</button></div></div>`;
+    }
     return `<div class="placed"><h1>Booking Confirmed</h1>
       <p>Thanks, ${esc(first(state.shopper.name))}. This booking used the ${esc(p.flow)}.</p>
       <p>LaunchDarkly received a <b>checkout-completed</b> event and ${money(p.amount)} of <b>checkout-revenue</b> for this parent. Those events feed experiments and guarded rollouts.</p>
       <div class="actions"><button class="btn" data-action="again">Book Another Session</button></div></div>`;
+  }
+
+  function applyExperience(enabled) {
+    document.body.dataset.ui = enabled ? "new" : "classic";
   }
 
   function renderCheckout(swap) {
@@ -772,6 +1013,7 @@
       state.data = data;
       state.enabled = data.enabled;
       state.assistantEnabled = data.assistant_enabled;
+      applyExperience(!!data.enabled);
 
       renderInspector();
       refreshBooking();
@@ -793,8 +1035,8 @@
         state.placed = null;
         renderCheckout(true);
         toast(data.enabled
-          ? `The new one-page booking flow is live for ${first(state.shopper.name)}. No redeploy and no refresh.`
-          : `Rolled back to the classic booking flow for ${first(state.shopper.name)}. No redeploy and no refresh.`);
+          ? `Harbor Dusk UI is live for ${first(state.shopper.name)} (new-checkout-flow on).`
+          : `Remediated to classic UI for ${first(state.shopper.name)} (new-checkout-flow off).`);
       }
     } catch (err) {
       setOffline(true);
@@ -828,6 +1070,7 @@
     else if (a === "back") { state.step = Math.max(0, state.step - 1); renderCheckout(false); }
     else if (a === "place") { placeOrder(b); }
     else if (a === "again") { state.placed = null; state.step = 0; renderCheckout(false); }
+    else if (a === "remediate") { remediateToClassic(); }
   });
 
   $("#assistant").addEventListener("click", (e) => {
