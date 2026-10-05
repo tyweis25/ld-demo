@@ -89,7 +89,6 @@ HTML is loaded once at Java startup (`CheckoutService.loadPage()`). After you ed
 | `LD_API_BASE` | No | EU accounts: `https://app.eu.launchdarkly.com` |
 | `PORT` | No | Java HTTP port, default `8080` |
 | `HOST` | No | Bind address, default `127.0.0.1` |
-| `FLAG_KEY` | No | Checkout flag, default `new-checkout-flow` |
 | `APP_VERSION` | No | Shown in the inspector, default `1.0.0` |
 | `BOOKING_PORT` | No | Sidecar port, default `8081` |
 | `BOOKING_HELPER_URL` | Set by `run.sh web` | `http://127.0.0.1:${BOOKING_PORT}` |
