@@ -83,7 +83,8 @@ class CheckoutServiceTest {
         assertTrue(html.contains("/api/events"));
         assertTrue(html.contains("EventSource"));
         assertTrue(html.contains("data-action=\"remediate\""));
-        assertTrue(html.contains("One-Page Booking") || html.contains("one-page") || html.contains("Address, Payment, And Review Are All On This Page"));
+        assertTrue(html.contains("Address, Payment, And Review Are All On This Page"));
+        assertTrue(html.contains("Harbor Dusk") || html.contains("data-ui=\"harbor\""));
         assertTrue(html.contains("X-LD-Demo"));
     }
 

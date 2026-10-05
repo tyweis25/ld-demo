@@ -48,20 +48,20 @@ case "${1:-help}" in
   experiment)  need_key; run TrafficSimulator "--minutes=${2:-30} --users=${3:-5000}" ;;
   guarded)     need_key; run TrafficSimulator "--flag=new-payment-service --bad --minutes=${2:-30}" ;;
   remediate)
-    # Part 1 remediate: POST the LaunchDarkly generic "turn off" trigger URL for new-checkout-flow.
-    # Create the trigger in LD UI (or API), copy the secret URL into .env as LD_FLAG_TRIGGER_URL.
-    # Never commit the URL.
+    # Remediate skin: POST the LaunchDarkly generic "turn off" trigger URL for new-booking-ui.
+    # Create the trigger on flag new-booking-ui, copy the secret URL into .env as LD_FLAG_TRIGGER_URL.
+    # Never commit the URL. Checkout flow (new-checkout-flow) is unchanged.
     if [[ -z "${LD_FLAG_TRIGGER_URL:-}" ]]; then
       echo "LD_FLAG_TRIGGER_URL is not set." >&2
-      echo "In LaunchDarkly: open flag new-checkout-flow → environment configuration →" >&2
+      echo "In LaunchDarkly: open flag new-booking-ui → environment configuration →" >&2
       echo "Add trigger → Generic → Turn flag off → copy the URL into .env as LD_FLAG_TRIGGER_URL." >&2
       exit 1
     fi
-    echo "Posting generic turn-off trigger for new-checkout-flow..."
+    echo "Posting generic turn-off trigger for new-booking-ui..."
     # Do not echo the URL (it is a secret).
     code="$(curl -sS -o /tmp/ld-remediate-body.txt -w "%{http_code}" -X POST "$LD_FLAG_TRIGGER_URL" || true)"
     if [[ "$code" =~ ^2 ]]; then
-      echo "OK (HTTP $code). new-checkout-flow targeting should now be Off."
+      echo "OK (HTTP $code). new-booking-ui targeting should now be Off (classic chrome)."
     else
       echo "Trigger request failed (HTTP ${code:-curl-error}). Check the URL is still valid in the LD UI." >&2
       exit 1
@@ -89,7 +89,7 @@ Usage: ./run.sh <command>
   flags              Feature flag demo (multi-context targeting, live change)
   experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min, 5000 users)
   guarded [min]      Bad-release traffic for the guarded rollout on new-payment-service
-  remediate          POST LD_FLAG_TRIGGER_URL to turn off new-checkout-flow (flag trigger)
+  remediate          POST LD_FLAG_TRIGGER_URL to turn off new-booking-ui (classic chrome)
   ai                 AI Config demo with kill switch
   booking [parent]   Agent booking helper (amelia or liam). Add --confirm to book.
   demo               Interview run: flags, then AI

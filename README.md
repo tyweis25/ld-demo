@@ -12,13 +12,14 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 
 | Requirement | Where it is implemented | How to run it |
 |---|---|---|
-| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form **inside the classic Amelia UI**: multi-step (flag off) vs one-page (flag on). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
-| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`) and pushes them to the page over **Server-Sent Events** (`GET /api/events`). A slow poll remains as fallback. The booking form swaps **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
-| **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` or the discreet **Remediate** control on the one-page form (`POST /api/remediate`) POSTs it. SSE rolls everyone back to multi-step. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` or click Remediate on the one-page checkout. |
+| **Part 1 — Feature flag (checkout flow)** | Boolean `new-checkout-flow`: multi-step (false) vs one-page (true) **inside** whichever chrome is active. | Toggle `new-checkout-flow` or switch Amelia/Liam. |
+| **Part 1 — Booking UI skin** | Boolean `new-booking-ui`: Harbor Dusk chrome (true) vs classic Amelia lavender (false). Fallthrough true for everyone when On. | Toggle `new-booking-ui` in LaunchDarkly. |
+| **Part 1 — Instant release / rollback** | SDK `addFlagChangeListener` → **SSE** (`GET /api/events`). Skin and form both live-update without reload. | Flip either flag while the page is open. |
+| **Part 1 — Remediate** | Generic flag trigger on **`new-booking-ui`** (not checkout). `LD_FLAG_TRIGGER_URL` + `./run.sh remediate` / in-UI Remediate → classic chrome. Checkout targeting unchanged. | Create trigger on `new-booking-ui` → `.env` → remediate. |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
 | **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH` (individual targets are evaluated **before** rules). For a clearer “beats the free-tier rule” demo, temporarily add `user-liam` → `true`, then remove it again. | Select Harper (reason `TARGET_MATCH`). |
-| **Part 2 — Rule-based targeting** | Rules: **organization** `tier` is `enterprise` → `true` (one-page); `tier` is `free` → `false` (multi-step). Inspector reason: `RULE_MATCH`. | Amelia = one-page; Liam = multi-step. |
+| **Part 2 — Rule-based targeting** | On `new-checkout-flow`: org `tier` enterprise → one-page; free → multi-step. Skin is separate (`new-booking-ui`). | Amelia = one-page; Liam = multi-step (both can be Harbor Dusk). |
 | **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
 | **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
 | **Extra credit — Integrations** | (1) LaunchDarkly hosted MCP + agent skills (`.cursor/mcp.json`, `.agents/skills`) for Cursor. (2) Flag trigger remediate (`LD_FLAG_TRIGGER_URL` + `./run.sh remediate`). | Connect MCP in Cursor; run `./run.sh remediate` after setting the trigger URL. |
@@ -82,7 +83,9 @@ HTML is loaded once at Java startup (`CheckoutService.loadPage()`). After you ed
 | `LD_API_TOKEN` | No | Makes the AI kill-switch button work (REST, not the SDK) |
 | `LD_PROJECT_KEY` | With token | Usually `default` |
 | `LD_ENV_KEY` | With token | Must match the SDK key’s environment (`test`, `production`, …) |
-| `LD_FLAG_TRIGGER_URL` | No | Secret URL for the generic **turn off** trigger on `new-checkout-flow`. Used by `./run.sh remediate`. Never commit |
+| `LD_FLAG_TRIGGER_URL` | No | Secret URL for the generic **turn off** trigger on **`new-booking-ui`**. Used by `./run.sh remediate`. Never commit |
+| `UI_FLAG_KEY` | No | Skin flag, default `new-booking-ui` |
+| `FLAG_KEY` | No | Checkout flag, default `new-checkout-flow` |
 | `LD_API_BASE` | No | EU accounts: `https://app.eu.launchdarkly.com` |
 | `PORT` | No | Java HTTP port, default `8080` |
 | `HOST` | No | Bind address, default `127.0.0.1` |
@@ -154,14 +157,14 @@ Recreate these in your trial project if they are not already there. The code key
 
 Amelia (enterprise) gets one-page checkout via the rule. Liam (`org-bright` / free) gets multi-step via the free rule. Harper gets one-page as an individual target (`TARGET_MATCH`). All of this stays inside the classic Amelia lavender UI.
 
-**Flag trigger (Part 1 remediate)**
+**Flag trigger (Part 1 remediate — skin)**
 
-1. Open `new-checkout-flow` → environment overflow → **Configuration in environment**.
+1. Open **`new-booking-ui`** → environment overflow → **Configuration in environment**.
 2. **Add trigger** → **Generic** → action **Turn flag off**.
 3. Copy the secret URL into `.env` as `LD_FLAG_TRIGGER_URL` (never commit it).
-4. Run `./run.sh remediate` to POST the URL and turn targeting Off.
+4. Run `./run.sh remediate` (or the in-UI Remediate control) to turn the skin Off → classic chrome.
 
-The AI assistant button still uses REST (`LD_API_TOKEN`) against `ai-assistant-enabled`. That is separate from the checkout flag trigger.
+`new-checkout-flow` targeting is unchanged by remediate. The AI assistant button still uses REST (`LD_API_TOKEN`) against `ai-assistant-enabled`.
 
 **`new-payment-service`** (boolean, optional guarded-rollout beyond the lab)
 
@@ -256,7 +259,7 @@ The sidecar stays up for the life of `./run.sh web`. It does not book on a timer
 | `flags` | Console multi-context demo |
 | `experiment [min]` | Traffic for `new-checkout-flow` (default 30 min, 5000 users) |
 | `guarded [min]` | Bad-release traffic for `new-payment-service` |
-| `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-checkout-flow` |
+| `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-booking-ui` (classic chrome) |
 | `ai` | Console AI Config + kill switch |
 | `booking [parent]` | One-shot booking helper (`amelia` or `liam`). Add `--confirm` to book |
 | `demo` | `flags` then `ai` |
@@ -276,12 +279,13 @@ mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 The inspector at the top shows checkout variation, assistant on/off, booking-agent variation, latest accuracy score, and the evaluation reason.
 
 - **Booking As** switches Amelia / Harper / Liam. The layout, assistant variation, and booking tools change with that context.
-- **Multi-step booking** (`new-checkout-flow` off): Address → Payment → Review.
-- **One-page booking** (`new-checkout-flow` on): all three on one page — same classic Amelia chrome.
-- The page opens an **SSE** connection to `/api/events`. When the SDK sees a flag change, the form refreshes immediately. A 3s poll remains as fallback.
+- **Chrome:** `new-booking-ui` on → Harbor Dusk skin; off → classic Amelia lavender.
+- **Multi-step booking** (`new-checkout-flow` off): Address → Payment → Review (works in either chrome).
+- **One-page booking** (`new-checkout-flow` on): all three on one page (works in either chrome).
+- **SSE** (`/api/events`) live-updates both skin and form. A 3s poll remains as fallback.
 - **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
-- **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set. Otherwise the button is disabled and you flip the flag in the dashboard.
-- **Remediate (Turn Flag Off)** (one-page form only) POSTs `/api/remediate`, which curls `LD_FLAG_TRIGGER_URL` on the server. Same effect as `./run.sh remediate`.
+- **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set.
+- **Remediate To Classic Chrome** (Harbor only) POSTs `/api/remediate` → turns off `new-booking-ui`. Same as `./run.sh remediate`. Does not change checkout flow.
 - **Find Sitters / Confirm Booking** go through Java to the Python sidecar.
 
 ### HTTP API
@@ -297,7 +301,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 | GET | `/api/booking-status` | Proxy to sidecar `GET /status` |
 | POST | `/api/booking` | Proxy to sidecar `POST /ask` |
 | POST | `/api/killswitch?state=on\|off` | REST toggle of `ai-assistant-enabled` |
-| POST | `/api/remediate` | Server-side POST of `LD_FLAG_TRIGGER_URL` (turns `new-checkout-flow` off) |
+| POST | `/api/remediate` | Server-side POST of `LD_FLAG_TRIGGER_URL` (turns `new-booking-ui` off → classic chrome) |
 | GET | `/health`, `/ready` | Liveness / SDK initialized |
 
 POSTs require header `X-LD-Demo: 1` so a random website cannot drive the kill switch from your browser.

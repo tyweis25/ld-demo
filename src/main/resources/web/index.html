@@ -6,7 +6,7 @@
 <title>Amelia's Babysitting Service</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=Literata:opsz,wght@7..72,600;7..72,700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #241C30;
@@ -233,9 +233,10 @@
   @media (prefers-reduced-motion: reduce) {
     .checkout.swap { animation: none; }
     .inspector::before { transition: none; }
+    body[data-ui="harbor"] .checkout.swap { animation: none; }
   }
 
-  /* Discreet remediate control on the one-page (flag-on) checkout only */
+  /* Discreet remediate — shown when Harbor Dusk skin is on */
   .remediate-row {
     display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
     gap: 10px 16px; margin-top: 8px;
@@ -248,9 +249,95 @@
   .btn-remediate:hover { color: var(--danger); }
   .btn-remediate[disabled] { opacity: .5; cursor: progress; text-decoration: none; }
   .remediate-row .hint { margin: 0; font-size: 12px; color: var(--muted); max-width: 36ch; }
+
+  /* ---- new-booking-ui true: Harbor Dusk skin (chrome only; form flow is separate) ---- */
+  body[data-ui="harbor"] {
+    --ink: #0E2F2A;
+    --paper: #D7E4E1;
+    --surface: #F3F7F5;
+    --wash: #E5EFEC;
+    --rule: #B7CBC5;
+    --muted: #4A6560;
+    --brand: #0E2F2A;
+    --signal: #1F7A5C;
+    --signal-tint: #D8F0E6;
+    --hold: #3D6B66;
+    --hold-tint: #D5E8E4;
+    --danger: #8B3A2F;
+    --danger-tint: #F3E2DE;
+    --focus: #C9862A;
+    --accent: #C9862A;
+    --display: "Literata", "Iowan Old Style", Georgia, serif;
+    --body: "Sora", "Segoe UI", system-ui, sans-serif;
+    --radius: 4px;
+    --shadow: 0 1px 0 rgba(14, 47, 42, 0.06);
+    background:
+      linear-gradient(180deg, #1A4A43 0px, #1A4A43 168px, transparent 168px),
+      radial-gradient(1200px 480px at 10% -5%, #2A6B61 0%, transparent 55%),
+      radial-gradient(900px 420px at 100% 8%, #C9862A33 0%, transparent 45%),
+      linear-gradient(180deg, #C5D8D4, var(--paper) 42%, #E8F0ED);
+    color: var(--ink);
+    font-family: var(--body);
+  }
+  body[data-ui="harbor"] .page { padding-top: 12px; }
+  body[data-ui="harbor"] .top {
+    border-bottom: 0; padding: 12px 0 28px; margin-bottom: 8px; color: #F3F7F5;
+  }
+  body[data-ui="harbor"] .brand-name {
+    font: 700 28px/1.05 var(--display); letter-spacing: -0.03em; color: #F7FBF9;
+  }
+  body[data-ui="harbor"] .brand-sub { color: #D5E8E4; letter-spacing: 0.14em; font-size: 11px; }
+  body[data-ui="harbor"] .mark {
+    background: var(--accent); color: #0E2F2A; border-radius: 3px; width: 44px; height: 44px;
+  }
+  body[data-ui="harbor"] .who-label { color: #D5E8E4; }
+  body[data-ui="harbor"] .who-list {
+    background: rgba(243, 247, 245, 0.12); border-color: rgba(243, 247, 245, 0.28); border-radius: 3px;
+  }
+  body[data-ui="harbor"] .who-btn { border-right-color: rgba(243, 247, 245, 0.22); color: #F3F7F5; }
+  body[data-ui="harbor"] .who-btn span { color: #D5E8E4; }
+  body[data-ui="harbor"] .who-btn[aria-pressed="true"] { background: var(--accent); color: #0E2F2A; }
+  body[data-ui="harbor"] .who-btn[aria-pressed="true"] span { color: rgba(14, 47, 42, 0.72); }
+  body[data-ui="harbor"] .inspector {
+    background: rgba(243, 247, 245, 0.92); border-color: var(--rule); border-radius: 3px; box-shadow: none;
+  }
+  body[data-ui="harbor"] .inspector::before { background: var(--accent); border-radius: 0; width: 3px; }
+  body[data-ui="harbor"] .inspector[data-on="true"]::before { background: var(--signal); }
+  body[data-ui="harbor"] .fact { border-radius: 3px; background: #fff; }
+  body[data-ui="harbor"] .pill { border-radius: 3px; }
+  body[data-ui="harbor"] .panel,
+  body[data-ui="harbor"] .summary,
+  body[data-ui="harbor"] .assistant {
+    background: #fff; border-color: var(--rule); border-radius: 3px; box-shadow: none;
+  }
+  body[data-ui="harbor"] .btn {
+    background: var(--accent); color: #0E2F2A; border-radius: 3px; letter-spacing: 0.02em;
+  }
+  body[data-ui="harbor"] .btn:hover { background: #B57520; }
+  body[data-ui="harbor"] .btn-secondary {
+    background: transparent; border-color: var(--rule); color: var(--ink); border-radius: 3px;
+  }
+  body[data-ui="harbor"] .field input,
+  body[data-ui="harbor"] .ask input,
+  body[data-ui="harbor"] .booking-ask input {
+    border-radius: 3px; background: #fff; border-color: var(--rule);
+  }
+  body[data-ui="harbor"] .field input:focus,
+  body[data-ui="harbor"] .ask input:focus,
+  body[data-ui="harbor"] .booking-ask input:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 134, 42, 0.22);
+  }
+  body[data-ui="harbor"] .choice { border-radius: 3px; background: #fff; }
+  body[data-ui="harbor"] .choice:has(input:checked) { border-color: var(--accent); background: #FFF8EC; }
+  body[data-ui="harbor"] .choice input { accent-color: var(--accent); }
+  body[data-ui="harbor"] .toast { background: #0E2F2A; border-radius: 3px; }
+  body[data-ui="harbor"] .btn-remediate { color: #D5E8E4; }
+  body[data-ui="harbor"] .btn-remediate:hover { color: #F3E2DE; }
+  body[data-ui="harbor"] .steps li[aria-current="step"] { border-bottom-color: var(--accent); }
+  body[data-ui="harbor"] .steps li[aria-current="step"] b { background: var(--accent); color: #0E2F2A; border-color: var(--accent); }
 </style>
 </head>
-<body>
+<body data-ui="classic">
 <div class="page">
 
   <header class="top">
@@ -355,8 +442,8 @@
   const planName = (tier) => String(tier || "").replace(/^./, (c) => c.toUpperCase());
 
   const state = {
-    shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, pollAgain: false, toastTimer: null,
-    config: { can_toggle: false, can_remediate: false, assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
+    shopper: SHOPPERS[0], data: null, enabled: null, uiEnabled: null, step: 0, placed: null, inflight: false, pollAgain: false, toastTimer: null,
+    config: { can_toggle: false, can_remediate: false, checkout_flag: "new-checkout-flow", ui_flag: "new-booking-ui", assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
     assistantEnabled: null, answer: null, asking: false, ksBusy: false, remediateBusy: false,
     booking: null, bookingReply: null, bookingAsking: false
   };
@@ -386,11 +473,16 @@
   // ---------- Release inspector ----------
   function renderInspector() {
     const d = state.data, s = state.shopper;
-    $("#inspector").dataset.on = String(d.enabled);
+    $("#inspector").dataset.on = String(!!d.ui_enabled);
     $("#insp-who").textContent = first(s.name) + " · " + planName(s.tier) + " Plan";
     const ver = $("#insp-version");
     if (ver) ver.textContent = d.app_version || "—";
     $("#facts").innerHTML = `
+      <article class="fact">
+        <div class="kicker">Booking UI</div>
+        <div class="value">${d.ui_enabled ? "Harbor Dusk" : "Classic"}</div>
+        <span class="pill" data-state="${d.ui_enabled ? "on" : "off"}">${d.ui_enabled ? "On" : "Off"}</span>
+      </article>
       <article class="fact">
         <div class="kicker">Checkout</div>
         <div class="value">${esc(shortFlow(d.flow))}</div>
@@ -405,13 +497,10 @@
         <div class="kicker">Booking Agent</div>
         <div class="value">${bookingHeadline()}</div>
         ${bookingFact()}
-      </article>
-      <article class="fact">
-        <div class="kicker">Accuracy</div>
-        <div class="value">${accuracyHeadline()}</div>
-        ${judgeFact()}
       </article>`;
-    $("#why").textContent = REASONS[d.reason_kind] || d.reason;
+    const whyCheckout = REASONS[d.reason_kind] || d.reason;
+    const whyUi = REASONS[d.ui_reason_kind] || d.ui_reason || "";
+    $("#why").textContent = `Checkout: ${whyCheckout}` + (whyUi ? ` · UI: ${whyUi}` : "");
     $("#raw").textContent = JSON.stringify({ checkout: d, booking: state.booking, assistant: state.answer }, null, 2);
   }
 
@@ -715,20 +804,19 @@
         toast(data.error || "Remediate didn't complete.");
         return;
       }
-      toast("Remediate posted. Switching to multi-step checkout…");
-      // Don't rely on a single poll: SDK stream + SSE can race; retry until classic.
-      await waitForEnabled(false, 2500);
-      if (state.enabled === false) {
-        toast(`Rolled back to multi-step booking for ${first(state.shopper.name)} (new-checkout-flow off).`);
+      toast("Remediate posted. Switching to classic chrome…");
+      await waitForUiEnabled(false, 2500);
+      if (state.uiEnabled === false) {
+        toast(`Classic Amelia chrome restored (new-booking-ui off). Checkout flow unchanged.`);
       } else {
-        toast("Flag trigger posted, but the UI hasn't flipped yet. It should update within a couple of seconds.");
+        toast("Flag trigger posted, but the skin hasn't flipped yet. It should update within a couple of seconds.");
         refreshAfterFlagChange();
       }
     } catch (err) {
       toast("Couldn't reach the service. Check that it's running, then try again.");
     } finally {
       state.remediateBusy = false;
-      if (state.enabled) renderCheckout(false);
+      renderCheckout(false);
     }
   }
 
@@ -738,6 +826,16 @@
     setTimeout(poll, 250);
     setTimeout(poll, 700);
     setTimeout(poll, 1400);
+  }
+
+  async function waitForUiEnabled(want, maxMs) {
+    const start = Date.now();
+    while (Date.now() - start < maxMs) {
+      await poll();
+      if (state.uiEnabled === want) return true;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return state.uiEnabled === want;
   }
 
   async function waitForEnabled(want, maxMs) {
@@ -789,21 +887,23 @@
   }
 
   function viewNew() {
-    const canRemediate = !!state.config.can_remediate;
-    const remLabel = state.remediateBusy ? "Remediating…" : "Remediate (Turn Flag Off)";
-    const remHint = canRemediate
-      ? "Posts the LaunchDarkly flag trigger on the server. Rolls everyone back to multi-step."
-      : "Set LD_FLAG_TRIGGER_URL in .env, or run ./run.sh remediate.";
     return `<h1>Book A Sitter</h1><p class="sub">Address, Payment, And Review Are All On This Page.</p>
       <section class="panel"><h2>Care Address</h2>${shippingFields()}</section>
       <section class="panel"><h2>Payment</h2>${paymentFields()}</section>
       <section class="panel"><h2>Review</h2>${reviewRows()}</section>
-      <div class="remediate-row">
-        <div class="actions" style="margin-top:0"><button class="btn" data-action="place">Book Session</button></div>
-        <div>
-          <button type="button" class="btn-remediate" data-action="remediate" ${(!canRemediate || state.remediateBusy) ? "disabled" : ""}>${remLabel}</button>
-          <span class="hint">${remHint}</span>
-        </div>
+      <div class="actions"><button class="btn" data-action="place">Book Session</button></div>`;
+  }
+
+  function remediateControls() {
+    if (!state.uiEnabled) return "";
+    const canRemediate = !!state.config.can_remediate;
+    const remLabel = state.remediateBusy ? "Remediating…" : "Remediate To Classic Chrome";
+    const remHint = canRemediate
+      ? "Turns off new-booking-ui via flag trigger. Checkout flow (one-page vs multi-step) is unchanged."
+      : "Set LD_FLAG_TRIGGER_URL in .env (trigger on new-booking-ui), or run ./run.sh remediate.";
+    return `<div class="remediate-row">
+        <button type="button" class="btn-remediate" data-action="remediate" ${(!canRemediate || state.remediateBusy) ? "disabled" : ""}>${remLabel}</button>
+        <span class="hint">${remHint}</span>
       </div>`;
   }
 
@@ -812,12 +912,19 @@
     return `<div class="placed"><h1>Booking Confirmed</h1>
       <p>Thanks, ${esc(first(state.shopper.name))}. This booking used the ${esc(p.flow)}.</p>
       <p>LaunchDarkly received a <b>checkout-completed</b> event and ${money(p.amount)} of <b>checkout-revenue</b> for this parent. Those events feed experiments and guarded rollouts.</p>
-      <div class="actions"><button class="btn" data-action="again">Book Another Session</button></div></div>`;
+      <div class="actions"><button class="btn" data-action="again">Book Another Session</button></div>
+      ${remediateControls()}</div>`;
+  }
+
+  function applySkin(uiEnabled) {
+    document.body.dataset.ui = uiEnabled ? "harbor" : "classic";
   }
 
   function renderCheckout(swap) {
     const el = $("#checkout");
-    el.innerHTML = state.placed ? viewPlaced() : (state.enabled ? viewNew() : viewLegacy());
+    const body = state.placed ? viewPlaced() : (state.enabled ? viewNew() : viewLegacy());
+    const rem = state.placed ? "" : remediateControls();
+    el.innerHTML = body + rem;
     el.classList.remove("swap");
     if (swap) { void el.offsetWidth; el.classList.add("swap"); }
   }
@@ -844,10 +951,13 @@
         markChecked();
 
         const previous = state.enabled;
+        const prevUi = state.uiEnabled;
         const prevAssistant = state.assistantEnabled;
         state.data = data;
         state.enabled = data.enabled;
+        state.uiEnabled = !!data.ui_enabled;
         state.assistantEnabled = data.assistant_enabled;
+        applySkin(state.uiEnabled);
 
         renderInspector();
         refreshBooking();
@@ -862,17 +972,26 @@
             : `The AI assistant was turned off for ${first(state.shopper.name)}. One switch, no redeploy.`);
         }
 
-        if (previous === null) {
+        const flowChanged = previous !== null && previous !== data.enabled;
+        const uiChanged = prevUi !== null && prevUi !== state.uiEnabled;
+        if (previous === null || prevUi === null) {
           renderCheckout(false);
-        } else if (previous !== data.enabled) {
-          state.step = 0;
-          state.placed = null;
+        } else if (flowChanged || uiChanged) {
+          if (flowChanged) {
+            state.step = 0;
+            state.placed = null;
+          }
           renderCheckout(true);
-          // Skip toast if remediateToClassic will announce the flip.
           if (!state.remediateBusy) {
-            toast(data.enabled
-              ? `One-page booking is live for ${first(state.shopper.name)} (new-checkout-flow on).`
-              : `Rolled back to multi-step booking for ${first(state.shopper.name)} (new-checkout-flow off).`);
+            if (uiChanged) {
+              toast(state.uiEnabled
+                ? `Harbor Dusk chrome is live (new-booking-ui on).`
+                : `Classic Amelia chrome restored (new-booking-ui off).`);
+            } else if (flowChanged) {
+              toast(data.enabled
+                ? `One-page booking is live for ${first(state.shopper.name)} (new-checkout-flow on).`
+                : `Multi-step booking for ${first(state.shopper.name)} (new-checkout-flow off).`);
+            }
           }
         }
       } catch (err) {
@@ -932,6 +1051,7 @@
     if (!b) return;
     state.shopper = SHOPPERS.find((s) => s.id === b.dataset.id);
     state.enabled = null;   // switching shoppers is not a release, so re-render without a toast
+    state.uiEnabled = null;
     state.assistantEnabled = null;
     state.data = null;
     state.answer = null;

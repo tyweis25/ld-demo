@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  *   POST /api/assistant    ask the AI assistant (kill switch + AI Config + model call)
  *   GET  /api/booking-status  which booking-helper variation this shopper gets (Python sidecar)
  *   POST /api/booking      ask the booking agent (Python sidecar evaluates the agent config)
- *   POST /api/killswitch   turn the AI assistant flag off or on through the LaunchDarkly REST API
+ *   POST /api/remediate   turn off new-booking-ui via LaunchDarkly flag trigger (skin → classic)
  *   GET  /health, /ready   liveness and readiness
  *
  * The browser never talks to LaunchDarkly and never sees your SDK key. This server evaluates flags
@@ -51,16 +51,18 @@ import java.util.concurrent.TimeUnit;
  *
  * Config (environment variables):
  *   LD_SDK_KEY                required — put your server-side SDK key in .env (never commit .env)
- *   FLAG_KEY                  optional; default flag key is new-checkout-flow (create that boolean flag)
+ *   FLAG_KEY                  optional; default checkout flag key is new-checkout-flow
+ *   UI_FLAG_KEY               optional; default skin flag key is new-booking-ui
  *   ANTHROPIC_API_KEY         optional, makes the assistant call a real model
  *   LD_API_TOKEN, LD_PROJECT_KEY, LD_ENV_KEY
  *                             optional, together they enable the AI kill switch button
- *   LD_FLAG_TRIGGER_URL       optional; used by ./run.sh remediate (generic turn-off trigger URL)
+ *   LD_FLAG_TRIGGER_URL       optional; generic turn-off trigger for new-booking-ui (./run.sh remediate)
  *   LD_API_BASE               optional, defaults to https://app.launchdarkly.com (EU: https://app.eu.launchdarkly.com)
  *   APP_VERSION, PORT, HOST   HOST defaults to 127.0.0.1 so only this machine can reach it
  *
  * Flags / configs this app expects you to create in LaunchDarkly:
- *   new-checkout-flow       — booking layout (classic vs one-page); Part 1 + Part 2 targeting
+ *   new-booking-ui          — Harbor Dusk skin (true) vs classic Amelia chrome (false); remediable
+ *   new-checkout-flow       — booking form flow (one-page vs multi-step); Part 2 targeting
  *   ai-assistant-enabled    — kill switch for the support assistant
  *   support-assistant       — AI Config (completion) for Ask
  *   babysitting-service-reply-accuracy — accuracy judge (optional)
@@ -72,6 +74,10 @@ public class CheckoutService {
 
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private static final String JSON = "application/json";
+    /** Create boolean flag new-booking-ui in LaunchDarkly (Harbor Dusk vs classic chrome). */
+    static final String DEFAULT_UI_FLAG = "new-booking-ui";
+    /** Create boolean flag new-checkout-flow in LaunchDarkly (one-page vs multi-step). */
+    static final String DEFAULT_CHECKOUT_FLAG = "new-checkout-flow";
     /** Open SSE clients. Each queue receives already-formatted SSE frames. */
     private static final Set<BlockingQueue<String>> SSE_CLIENTS = ConcurrentHashMap.newKeySet();
 
@@ -82,8 +88,8 @@ public class CheckoutService {
             System.err.println("Missing LD_SDK_KEY.");
             System.exit(1);
         }
-        // Create boolean flag new-checkout-flow in LaunchDarkly (or override with FLAG_KEY).
-        String flagKey = System.getenv().getOrDefault("FLAG_KEY", "new-checkout-flow");
+        String flagKey = System.getenv().getOrDefault("FLAG_KEY", DEFAULT_CHECKOUT_FLAG);
+        String uiFlagKey = System.getenv().getOrDefault("UI_FLAG_KEY", DEFAULT_UI_FLAG);
         String version = System.getenv().getOrDefault("APP_VERSION", "1.0.0");
         int port = Integer.parseInt(System.getenv().getOrDefault("PORT", "8080"));
         String host = System.getenv().getOrDefault("HOST", "127.0.0.1");
@@ -97,7 +103,7 @@ public class CheckoutService {
         String apiBase = System.getenv().getOrDefault("LD_API_BASE", "https://app.launchdarkly.com");
         boolean canToggle = !apiToken.isEmpty() && projectKey.matches("[A-Za-z0-9._-]+") && !envKey.isEmpty();
         String bookingHelperUrl = env("BOOKING_HELPER_URL");
-        // Secret generic turn-off trigger URL for new-checkout-flow. Never send this to the browser.
+        // Secret generic turn-off trigger URL for new-booking-ui. Never send this to the browser.
         String flagTriggerUrl = env("LD_FLAG_TRIGGER_URL");
         boolean canRemediate = flagTriggerUrl.startsWith("https://");
 
@@ -134,6 +140,8 @@ public class CheckoutService {
         server.createContext("/api/config", ex -> send(ex, 200, JSON, LDValue.buildObject()
                 .put("can_toggle", canToggle)
                 .put("can_remediate", canRemediate)
+                .put("checkout_flag", flagKey)
+                .put("ui_flag", uiFlagKey)
                 .put("assistant_flag", AiAssistant.KILL_SWITCH_FLAG)
                 .put("judge_key", AiAssistant.JUDGE_KEY)
                 .put("live_model", !anthropicKey.isEmpty())
@@ -143,8 +151,10 @@ public class CheckoutService {
         server.createContext("/api/checkout", ex -> {
             if (!ex.getRequestMethod().equals("GET")) { send(ex, 405, JSON, "{\"error\":\"use GET\"}"); return; }
             LDContext ctx = contextFrom(query(ex.getRequestURI().getRawQuery()));
-            // Flag key: new-checkout-flow (create this boolean flag in your LD project).
+            // Form flow: new-checkout-flow (enterprise → one-page, free → multi-step).
             EvaluationDetail<Boolean> d = client.boolVariationDetail(flagKey, ctx, false);
+            // Skin: new-booking-ui (true → Harbor Dusk, false → classic chrome). Default false if missing.
+            EvaluationDetail<Boolean> ui = client.boolVariationDetail(uiFlagKey, ctx, false);
             // Kill switch: ai-assistant-enabled (create this boolean flag; defaults false / fails closed).
             boolean assistantOn = client.boolVariation(AiAssistant.KILL_SWITCH_FLAG, ctx, false);
             send(ex, 200, JSON, LDValue.buildObject()
@@ -154,6 +164,10 @@ public class CheckoutService {
                     .put("flow", flowName(d.getValue()))
                     .put("reason_kind", d.getReason().getKind().name())
                     .put("reason", String.valueOf(d.getReason()))
+                    .put("ui_flag", uiFlagKey)
+                    .put("ui_enabled", ui.getValue())
+                    .put("ui_reason_kind", ui.getReason().getKind().name())
+                    .put("ui_reason", String.valueOf(ui.getReason()))
                     .put("assistant_enabled", assistantOn)
                     .build().toJsonString());
         });
@@ -266,16 +280,16 @@ public class CheckoutService {
             send(ex, 200, JSON, setKillSwitch(apiBase, apiToken, projectKey, envKey, state.equals("on")));
         });
 
-        // Part 1 remediate: POST the LaunchDarkly flag trigger URL server-side (never expose it to the browser).
+        // Remediate skin: POST the LaunchDarkly flag trigger for new-booking-ui (never expose URL to browser).
         server.createContext("/api/remediate", ex -> {
             if (!requirePost(ex)) return;
             if (!canRemediate) {
                 send(ex, 400, JSON, LDValue.buildObject().put("ok", false)
-                        .put("error", "Remediate isn't set up. Add LD_FLAG_TRIGGER_URL to .env (generic turn-off trigger on new-checkout-flow), or run ./run.sh remediate.")
+                        .put("error", "Remediate isn't set up. Add LD_FLAG_TRIGGER_URL to .env (generic turn-off trigger on new-booking-ui), or run ./run.sh remediate.")
                         .build().toJsonString());
                 return;
             }
-            send(ex, 200, JSON, postFlagTrigger(flagTriggerUrl, flagKey));
+            send(ex, 200, JSON, postFlagTrigger(flagTriggerUrl, uiFlagKey));
         });
 
         // Flush events and close cleanly on Ctrl+C or SIGTERM.
@@ -285,10 +299,11 @@ public class CheckoutService {
         }));
 
         server.start();
-        System.out.printf("Amelia's Babysitting Service %s is running at http://localhost:%d (flag: %s)%n", version, port, flagKey);
+        System.out.printf("Amelia's Babysitting Service %s is running at http://localhost:%d%n", version, port);
+        System.out.println("Checkout flow flag: " + flagKey + " | Booking UI skin flag: " + uiFlagKey);
         System.out.println("AI assistant model calls: " + (anthropicKey.isEmpty() ? "SIMULATED" : "LIVE (Anthropic)"));
         System.out.println("Kill switch button: " + (canToggle ? "enabled" : "disabled (no LD_API_TOKEN / LD_PROJECT_KEY / LD_ENV_KEY)"));
-        System.out.println("Remediate (flag trigger): " + (canRemediate ? "enabled" : "disabled (no LD_FLAG_TRIGGER_URL)"));
+        System.out.println("Remediate (new-booking-ui trigger): " + (canRemediate ? "enabled" : "disabled (no LD_FLAG_TRIGGER_URL)"));
         System.out.println("Booking agent sidecar: " + (bookingHelperUrl.isEmpty() ? "not configured" : bookingHelperUrl));
         System.out.println("Flag-change SSE: GET /api/events");
     }
@@ -309,7 +324,7 @@ public class CheckoutService {
     }
 
     /**
-     * POSTs the secret LaunchDarkly generic flag-trigger URL (turn off new-checkout-flow).
+     * POSTs the secret LaunchDarkly generic flag-trigger URL (turn off new-booking-ui).
      * The URL itself is never returned to the client.
      * Also nudges open SSE clients so the page re-polls even before the SDK stream lands.
      */
@@ -322,7 +337,7 @@ public class CheckoutService {
             HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
             int code = response.statusCode();
             if (code >= 200 && code < 300) {
-                System.out.println("Remediate: posted flag trigger (HTTP " + code + "). new-checkout-flow should turn Off.");
+                System.out.println("Remediate: posted flag trigger (HTTP " + code + "). " + flagKey + " should turn Off.");
                 // Wake browsers immediately; the real flag-change from the SDK usually follows within a second.
                 publishSse("flag-change", "{\"key\":\"" + jsonEscape(flagKey) + "\",\"source\":\"remediate\"}");
                 return LDValue.buildObject().put("ok", true).put("http_status", code).build().toJsonString();
