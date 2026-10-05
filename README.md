@@ -17,8 +17,8 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 | **Part 1 — Remediate** | LaunchDarkly **generic flag trigger** (turn off) on `new-checkout-flow`. URL stays in `.env` as `LD_FLAG_TRIGGER_URL`. `./run.sh remediate` or the discreet **Remediate** control on the new UI (`POST /api/remediate`) POSTs it. SSE flips the page back to classic. | Create trigger in LD → copy URL to `.env` → `./run.sh remediate` or click Remediate on the Harbor Dusk UI. |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
-| **Part 2 — Individual targeting** | Target user keys `user-harper` and `user-liam` to serve `true`. Individual targets are evaluated **before** rules, so Liam can get the new flow even when a free-tier rule would deny it. Inspector reason: `TARGET_MATCH`. | Select Harper or Liam. |
-| **Part 2 — Rule-based targeting** | Rule: **organization** `tier` is one of `enterprise` → `true`. Inspector reason: `RULE_MATCH`. | Select Amelia. |
+| **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH` (individual targets are evaluated **before** rules). For a clearer “beats the free-tier rule” demo, temporarily add `user-liam` → `true`, then remove it again. | Select Harper (reason `TARGET_MATCH`). |
+| **Part 2 — Rule-based targeting** | Rules: **organization** `tier` is `enterprise` → `true` (Harbor Dusk); `tier` is `free` → `false` (classic). Inspector reason: `RULE_MATCH`. | Amelia = Harbor Dusk; Liam = classic. |
 | **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
 | **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
 | **Extra credit — Integrations** | (1) LaunchDarkly hosted MCP + agent skills (`.cursor/mcp.json`, `.agents/skills`) for Cursor. (2) Flag trigger remediate (`LD_FLAG_TRIGGER_URL` + `./run.sh remediate`). | Connect MCP in Cursor; run `./run.sh remediate` after setting the trigger URL. |
@@ -136,7 +136,7 @@ Every evaluation is a **user + organization** multi-context. Account-level rules
 | Harper Reed | `user-harper` | parent | same org as Amelia | enterprise |
 | Liam Carter | `user-liam` | parent | `org-bright` Parkside Parents Co-op | free |
 
-Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **rule** (`RULE_MATCH`), Harper and Liam are **individual targets** (`TARGET_MATCH`). Individual targeting is evaluated before rules, so Liam (`free` org) still gets the new one-page flow when listed as an individual target even if a free-tier rule would otherwise serve classic. The inspector prints that reason.
+Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **enterprise rule** (`RULE_MATCH` → Harbor Dusk), Liam matches the **free rule** (`RULE_MATCH` → classic), and Harper is an **individual target** (`TARGET_MATCH` → Harbor Dusk). Individual targeting is evaluated before rules — for a live “override free tier” beat, temporarily add `user-liam` → `true`, then remove it so free stays classic.
 
 ## LaunchDarkly objects the code expects
 
@@ -146,13 +146,13 @@ Recreate these in your trial project if they are not already there. The code key
 
 **`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
 
-1. **Individual targeting:** add user keys `user-harper` and `user-liam` to serve `true`. Individual targets beat rules.
-2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true`.
-3. Optional free-tier rule → `false` (so Liam without an individual target would get classic).
-4. Default rule: `false` (or your experiment split).
+1. **Individual targeting:** add user key `user-harper` to serve `true` (shows `TARGET_MATCH` in the inspector). Optional demo: temporarily add `user-liam` → `true` to show individual targets beating the free-tier rule, then remove Liam again.
+2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true` (Harbor Dusk).
+3. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `free` → `false` (classic).
+4. Default / fallthrough: `false` (classic).
 5. Targeting On.
 
-Amelia (enterprise) gets the one-page checkout via the rule. Harper and Liam get it because they are named as individual targets.
+Amelia (enterprise) gets Harbor Dusk via the rule. Liam (`org-bright` / free) gets classic via the free rule. Harper gets Harbor Dusk as an individual target (`TARGET_MATCH`).
 
 **Flag trigger (Part 1 remediate)**
 
