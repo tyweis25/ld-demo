@@ -33,6 +33,11 @@ class TrafficSimulatorTest {
         assertTrue(custom.bad);
         assertEquals(0.15, TrafficSimulator.newErrorRate(true), 0.0001);
         assertEquals(0.02, TrafficSimulator.newErrorRate(false), 0.0001);
+
+        TrafficSimulator.Options ignored = TrafficSimulator.parseOptions(new String[]{"--unknown", "--minutes=2"});
+        assertEquals(2, ignored.minutes);
+        assertEquals("new-checkout-flow", ignored.flagKey);
+        assertFalse(ignored.bad);
     }
 
     @Test
@@ -46,5 +51,10 @@ class TrafficSimulatorTest {
         LDContext again = TrafficSimulator.simContext(0);
         assertEquals(ctx.getIndividualContext("organization").getKey(),
                 again.getIndividualContext("organization").getKey());
+
+        LDContext liamPool = TrafficSimulator.simContext(4);
+        assertEquals("org-bright", liamPool.getIndividualContext("organization").getKey());
+        assertEquals("free", liamPool.getIndividualContext("organization").getValue("tier").stringValue());
+        assertEquals("sim-user-4", liamPool.getIndividualContext("user").getKey());
     }
 }

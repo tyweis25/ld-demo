@@ -65,12 +65,19 @@ public class AiConfigDemo {
             System.out.println("AI assistant is OFF (" + a.reason + "). Showing fallback: \"Please contact support.\"");
             return;
         }
-        System.out.println("Model served by LaunchDarkly: " + a.model);
+        System.out.println("Model served by LaunchDarkly: " + a.model
+                + (a.variation != null ? " (" + a.variation + ")" : ""));
         if (a.error != null) {
             System.out.println("Model call failed, error recorded in LaunchDarkly: " + a.error);
             return;
         }
         System.out.printf("Tokens: %d in / %d out, %d ms%n", a.inputTokens, a.outputTokens, a.latencyMs);
         System.out.println("Reply:  " + a.text);
+        if (a.judgeScore != null) {
+            System.out.printf("Accuracy judge %s: %.2f%s%n", a.judgeKey, a.judgeScore,
+                    a.judgeReasoning != null ? " — " + a.judgeReasoning : "");
+        } else if (a.judgeError != null) {
+            System.out.println("Accuracy judge: " + a.judgeError);
+        }
     }
 }

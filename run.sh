@@ -31,6 +31,15 @@ case "${1:-help}" in
     ;;
   web)
     need_key
+    py="$(command -v python3)"
+    if [[ -x booking/.venv/bin/python ]]; then py="$(pwd)/booking/.venv/bin/python"; fi
+    booking_port="${BOOKING_PORT:-8081}"
+    export BOOKING_HELPER_URL="http://127.0.0.1:${booking_port}"
+    echo "Starting the booking agent sidecar on ${BOOKING_HELPER_URL}"
+    (cd booking && "$py" booking_helper.py --serve --port "$booking_port") &
+    booking_pid=$!
+    cleanup() { kill "$booking_pid" 2>/dev/null || true; }
+    trap cleanup EXIT INT TERM
     echo "Starting Amelia's Babysitting Service. Open http://localhost:${PORT:-8080} in your browser. Ctrl+C to stop."
     run CheckoutService
     ;;
@@ -38,6 +47,12 @@ case "${1:-help}" in
   experiment)  need_key; run TrafficSimulator "--minutes=${2:-30}" ;;
   guarded)     need_key; run TrafficSimulator "--flag=new-payment-service --bad --minutes=${2:-30}" ;;
   ai)          need_key; run AiConfigDemo ;;
+  booking)
+    need_key
+    py="$(command -v python3)"
+    if [[ -x booking/.venv/bin/python ]]; then py="$(pwd)/booking/.venv/bin/python"; fi
+    (cd booking && "$py" booking_helper.py "${2:-amelia}" ${3:+"$3"})
+    ;;
   demo)
     need_key
     echo "== 1/2 Feature flags =="; run FeatureFlagDemo
@@ -54,6 +69,7 @@ Usage: ./run.sh <command>
   experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min)
   guarded [min]      Bad-release traffic for the guarded rollout on new-payment-service
   ai                 AI Config demo with kill switch
+  booking [parent]   Agent booking helper (amelia or liam). Add --confirm to book.
   demo               Interview run: flags, then AI
 USAGE
     ;;

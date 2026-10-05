@@ -1,0 +1,3 @@
+launchdarkly-server-sdk>=9.0.0
+launchdarkly-ai-server==0.2.4
+launchdarkly-ai-claude-agents==0.2.4

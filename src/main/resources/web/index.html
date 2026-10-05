@@ -6,154 +6,229 @@
 <title>Amelia's Babysitting Service</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink: #3A2B55;
-    --paper: #EDE4F5;
-    --surface: #F7F1FC;
-    --rule: #D2C2E6;
-    --muted: #6B5A82;
-    --signal: #5B3A9E;
-    --signal-tint: #E4D7F5;
-    --hold: #8A5A9E;
-    --hold-tint: #F0E4F7;
-    --focus: #7B5BB5;
-    --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-    --body: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --ink: #241C30;
+    --paper: #E8F3FB;
+    --surface: #FFFFFF;
+    --wash: #F4F9FC;
+    --rule: #D4E3EE;
+    --muted: #6B6472;
+    --brand: #4A2F6A;
+    --signal: #2F6B4F;
+    --signal-tint: #E7F3EC;
+    --hold: #5B6FA8;
+    --hold-tint: #E7ECF8;
+    --danger: #6B5A9A;
+    --danger-tint: #EEE8F7;
+    --focus: #6B4C9A;
+    --shadow: 0 1px 2px rgba(36, 28, 48, 0.04), 0 8px 24px rgba(36, 28, 48, 0.06);
+    --display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --radius: 12px;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0;
     background:
-      radial-gradient(1200px 600px at 10% -10%, #f4ecfb 0%, transparent 55%),
-      radial-gradient(900px 500px at 100% 0%, #e0d0f0 0%, transparent 50%),
+      radial-gradient(900px 420px at 0% -10%, #d7ecf8 0%, transparent 55%),
+      radial-gradient(800px 360px at 100% 0%, #cfe6f5 0%, transparent 50%),
       var(--paper);
     color: var(--ink);
     font: 400 16px/1.5 var(--body);
   }
-  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   button, input { font: inherit; color: inherit; }
-  h1, h2, h3 { font-family: var(--display); font-weight: 700; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.2; margin: 0; letter-spacing: -0.02em; }
 
-  .page { max-width: 1080px; margin: 0 auto; padding: 20px 20px 64px; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 20px 24px 72px; }
 
-  /* Header and shopper switcher */
-  .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; }
-  .brand { display: flex; align-items: center; gap: 10px; font: 700 22px/1 var(--display); }
-  .brand svg { color: var(--ink); }
-  .who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-  .who-label { color: var(--muted); font-size: 14px; }
-  .who-list { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0; }
-  .who-btn {
-    text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px;
-    padding: 8px 12px; cursor: pointer; min-height: 44px;
+  .top {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px;
+    padding: 8px 0 20px; margin-bottom: 20px; border-bottom: 1px solid var(--rule);
   }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .mark {
+    display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px;
+    background: var(--brand); color: #fff; flex: 0 0 auto;
+  }
+  .brand-copy { display: flex; flex-direction: column; gap: 1px; }
+  .brand-name { font: 600 18px/1.15 var(--display); }
+  .brand-sub { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .who-label { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .who-list {
+    display: inline-flex; flex-wrap: nowrap; gap: 0; border: 1px solid var(--rule); border-radius: 10px;
+    padding: 0; margin: 0; background: var(--surface); overflow: hidden;
+  }
+  .who-btn {
+    text-align: left; background: transparent; border: 0; border-right: 1px solid var(--rule);
+    padding: 7px 12px; cursor: pointer; min-height: 44px;
+  }
+  .who-btn:last-child { border-right: 0; }
   .who-btn b { display: block; font-weight: 600; font-size: 14px; }
   .who-btn span { display: block; font-size: 12px; color: var(--muted); }
-  .who-btn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .who-btn[aria-pressed="true"] { background: var(--brand); color: #fff; }
+  .who-btn[aria-pressed="true"] span { color: rgba(255,255,255,0.78); }
 
-  /* Release inspector: the left bar carries the checkout flag's state */
   .inspector {
-    position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: 4px;
-    padding: 16px 20px 14px 28px; margin-bottom: 24px;
+    position: relative; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 20px 22px 16px 26px; margin-bottom: 28px;
   }
   .inspector::before {
-    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 10px;
+    content: ""; position: absolute; left: 0; top: 16px; bottom: 16px; width: 4px; border-radius: 999px;
     background: var(--hold); transition: background-color .3s ease;
   }
   .inspector[data-on="true"]::before { background: var(--signal); }
-  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 24px; margin: 0; }
-  .facts dt { font-size: 13px; color: var(--muted); }
-  .facts dd { margin: 2px 0 0; font-weight: 600; }
-  .pill { display: inline-block; padding: 1px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; background: var(--hold-tint); color: var(--hold); }
+  .insp-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px 24px; margin-bottom: 16px; }
+  .insp-kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  .insp-who { font: 600 24px/1.2 var(--display); margin: 4px 0 0; }
+  .facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
+  .fact { padding: 14px 16px; border-radius: 10px; border: 1px solid var(--rule); background: var(--wash); min-width: 0; }
+  .fact .kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+  .fact .value { font: 600 17px/1.3 var(--display); margin: 6px 0 10px; overflow-wrap: break-word; }
+  .pill { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--hold-tint); color: var(--hold); }
   .pill[data-state="on"] { background: var(--signal-tint); color: var(--signal); }
-  .why { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
-  .insp-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 10px; font-size: 13px; color: var(--muted); }
-  details.api { margin-top: 8px; font-size: 13px; }
+  .why { margin: 0; font-size: 14px; color: var(--muted); max-width: 38ch; text-align: right; line-height: 1.45; }
+  .insp-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; margin-top: 14px; font-size: 12px; color: var(--muted); }
+  details.api { margin-top: 10px; font-size: 13px; }
   details.api summary { cursor: pointer; color: var(--muted); width: fit-content; }
-  details.api pre { margin: 8px 0 0; padding: 12px; background: var(--paper); border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  details.api pre { margin: 8px 0 0; padding: 12px; background: var(--wash); border: 1px solid var(--rule); border-radius: 8px; overflow-x: auto; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 
-  .notice { border-radius: 4px; padding: 10px 14px; margin-bottom: 16px; font-size: 14px; }
-  .notice-error { background: #FBE9E7; color: #8A2A1B; border: 1px solid #F0C2BA; }
-  .toast { background: var(--ink); color: #fff; margin-bottom: 16px; padding: 12px 16px; border-radius: 4px; font-weight: 500; }
+  .notice { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
+  .notice-error { background: var(--danger-tint); color: var(--danger); border: 1px solid #C9C2DC; }
+  .toast { background: var(--ink); color: #fff; margin-bottom: 16px; padding: 12px 16px; border-radius: 10px; font-weight: 500; box-shadow: var(--shadow); }
   .toast[hidden], .notice[hidden] { display: none; }
 
-  /* Main layout */
-  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; align-items: start; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); gap: 28px; align-items: start; }
   .checkout { min-width: 0; }
   .checkout.swap { animation: swap .28s ease-out; }
-  @keyframes swap { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-  .checkout h1 { font-size: 30px; margin-bottom: 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
+  @keyframes swap { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .checkout h1 { font-size: 32px; margin-bottom: 6px; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
   .loading { color: var(--muted); padding: 24px 0; }
 
-  .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; margin-bottom: 16px; }
-  .panel h2 { font-size: 19px; margin-bottom: 14px; }
-  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
-  .field { display: flex; flex-direction: column; gap: 4px; }
+  .panel, .summary, .assistant {
+    background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 22px;
+  }
+  .panel { margin-bottom: 16px; }
+  .panel h2, .summary h2, .assistant h2 { font-size: 20px; margin-bottom: 14px; }
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
   .field.wide { grid-column: 1 / -1; }
-  .field label { font-size: 14px; font-weight: 500; }
-  .field input { border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; background: #FBF7FF; min-height: 44px; }
-  .choice { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--rule); border-radius: 6px; margin-bottom: 8px; cursor: pointer; }
-  .choice input { width: 18px; height: 18px; accent-color: var(--ink); }
-  .review-row { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  .field label { font-size: 13px; font-weight: 600; color: var(--muted); }
+  .field input, .ask input, .booking-ask input {
+    border: 1px solid var(--rule); border-radius: 8px; padding: 11px 12px; background: var(--wash); min-height: 44px;
+  }
+  .field input:focus, .ask input:focus, .booking-ask input:focus {
+    outline: none; border-color: var(--brand); background: #fff; box-shadow: 0 0 0 3px rgba(74, 47, 106, 0.12);
+  }
+  .choice {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--rule);
+    border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: var(--wash);
+  }
+  .choice:has(input:checked) { border-color: var(--brand); background: #F4EEF8; }
+  .choice input { width: 18px; height: 18px; accent-color: var(--brand); }
+  .review-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
   .review-row:last-child { border-bottom: 0; }
   .review-row span:first-child { color: var(--muted); }
 
-  .steps { display: flex; list-style: none; padding: 0; margin: 0 0 20px; border-bottom: 1px solid var(--rule); }
-  .steps li { flex: 1; padding: 0 0 12px; color: var(--muted); font-size: 15px; border-bottom: 3px solid transparent; margin-bottom: -1px; }
-  .steps li b { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--rule); font-size: 13px; }
-  .steps li[aria-current="step"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
-  .steps li[aria-current="step"] b { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .steps { display: flex; list-style: none; padding: 0; margin: 0 0 22px; border-bottom: 1px solid var(--rule); }
+  .steps li { flex: 1; padding: 0 0 12px; color: var(--muted); font-size: 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .steps li b { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 50%; border: 1px solid var(--rule); font-size: 12px; }
+  .steps li[aria-current="step"] { color: var(--ink); font-weight: 600; border-bottom-color: var(--brand); }
+  .steps li[aria-current="step"] b { background: var(--brand); color: #fff; border-color: var(--brand); }
   .steps li[data-done="true"] b { background: var(--signal-tint); border-color: var(--signal); color: var(--signal); }
 
   .actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-  .btn { background: var(--ink); color: #fff; border: 0; border-radius: 6px; padding: 12px 22px; font-weight: 600; cursor: pointer; min-height: 44px; }
-  .btn:hover { background: #4E3A6E; }
-  .btn[disabled] { opacity: .6; cursor: progress; }
+  .btn {
+    background: var(--brand); color: #fff; border: 0; border-radius: 8px; padding: 12px 20px;
+    font-weight: 600; cursor: pointer; min-height: 44px;
+  }
+  .btn:hover { background: #3C2558; }
+  .btn[disabled] { opacity: .55; cursor: progress; }
   .btn-quiet { background: transparent; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; padding: 12px 8px; }
   .btn-quiet:hover { background: transparent; text-decoration-thickness: 2px; }
 
-  /* Right column: order summary and AI assistant */
   .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-  .summary { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; }
-  .summary h2 { font-size: 19px; margin-bottom: 12px; }
-  .item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
-  .item small { display: block; color: var(--muted); font-size: 13px; }
+  .item { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--rule); font-size: 15px; }
+  .item small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
   .totals { display: flex; justify-content: space-between; padding-top: 14px; font-weight: 600; font-size: 18px; }
   .ship { display: flex; justify-content: space-between; padding: 10px 0 0; color: var(--muted); font-size: 14px; }
 
-  .assistant { background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 20px; }
-  .assistant h2 { font-size: 19px; margin-bottom: 6px; }
-  .assistant .sub { font-size: 14px; margin: 0 0 12px; }
-  .quick { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-  .quick button { text-align: left; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 8px 12px; cursor: pointer; min-height: 40px; font-size: 14px; }
-  .quick button:hover { border-color: var(--ink); }
+  .tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+  .tool { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--wash); border: 1px solid var(--rule); }
+  .reply { white-space: pre-wrap; margin: 0; }
+  .booking-ask { display: flex; flex-direction: column; gap: 10px; }
+  .booking-ask input { width: 100%; }
+  .booking-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn-secondary { background: #fff; color: var(--ink); border: 1px solid var(--rule); }
+  .btn-secondary:hover { border-color: var(--brand); background: #F4EEF8; }
+  .capability { margin: 12px 0; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .capability .result-pct { font-size: 20px; min-width: 0; }
+  .tool-card { margin-bottom: 12px; }
+  .assistant h2 { margin-bottom: 6px; }
+  .assistant .sub { font-size: 14px; margin: 0 0 14px; }
+  .quick { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .quick button {
+    text-align: left; background: var(--wash); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 10px 12px; cursor: pointer; min-height: 42px; font-size: 14px;
+  }
+  .quick button:hover { border-color: var(--brand); background: #F4EEF8; }
   .ask { display: flex; gap: 8px; }
-  .ask input { flex: 1; min-width: 0; border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; min-height: 44px; background: #FBF7FF; }
+  .ask input { flex: 1; min-width: 0; }
   .ask .btn { padding: 12px 16px; }
-  .answer { margin-top: 14px; border-left: 3px solid var(--signal); padding-left: 12px; }
+  .answer { margin-top: 16px; }
   .answer p { margin: 0; }
-  .answer .meta { color: var(--muted); font-size: 13px; margin-top: 6px; }
-  .answer.failed { border-left-color: var(--hold); }
-  .off { background: var(--hold-tint); border-radius: 4px; padding: 12px 14px; color: #5E3700; }
+  .answer .meta { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .result { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .result-score {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border-radius: 10px; border: 1px solid var(--rule); background: var(--wash);
+  }
+  .result-score[data-pass="true"] { border-color: #B9D6C4; background: var(--signal-tint); }
+  .result-score[data-pass="false"] { border-color: #C9C2DC; background: var(--danger-tint); }
+  .result-pct { font: 600 36px/1 var(--display); letter-spacing: -0.03em; min-width: 4ch; }
+  .result-score[data-pass="true"] .result-pct { color: var(--signal); }
+  .result-score[data-pass="false"] .result-pct { color: var(--danger); }
+  .result-copy { min-width: 0; }
+  .result-copy .label { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  .result-copy .verdict { font: 600 16px/1.3 var(--display); margin-top: 2px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--wash); border: 1px solid var(--rule); }
+  .reply-card, .why-card {
+    padding: 14px 16px; border-radius: 10px; border: 1px solid var(--rule); background: var(--wash);
+  }
+  .reply-card .kicker, .why-card .kicker {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+  }
+  .reply-card .body, .why-card .body {
+    font-size: 15px; line-height: 1.55; overflow-wrap: break-word; word-break: normal;
+  }
+  .answer.failed { border-left: 3px solid var(--hold); padding-left: 12px; }
+  .off { background: var(--hold-tint); border-radius: 10px; padding: 12px 14px; color: var(--hold); }
   .off p { margin: 0; }
   .off p + p { margin-top: 4px; }
   .ks { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
-  .btn-ks { background: #FBF7FF; color: var(--hold); border: 1px solid var(--hold); border-radius: 6px; padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
-  .btn-ks[data-restore="true"] { color: var(--signal); border-color: var(--signal); }
+  .btn-ks { background: #fff; color: var(--hold); border: 1px solid #B8C4DC; border-radius: 8px; padding: 10px 14px; font-weight: 600; cursor: pointer; min-height: 44px; }
+  .btn-ks[data-restore="true"] { color: var(--signal); border-color: #B9D6C4; }
   .btn-ks[disabled] { opacity: .55; cursor: not-allowed; }
   .hint { display: block; margin-top: 8px; font-size: 13px; color: var(--muted); }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-  .placed h1 { font-size: 30px; }
-  .placed p { max-width: 60ch; }
+  .placed h1 { font-size: 32px; }
+  .placed p { max-width: 60ch; color: var(--muted); }
 
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
     .fields { grid-template-columns: 1fr; }
+    .facts { grid-template-columns: 1fr 1fr; }
+    .why { text-align: left; max-width: none; }
+    .who-list { width: 100%; }
+    .who-btn { flex: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
     .checkout.swap { animation: none; }
@@ -166,11 +241,16 @@
 
   <header class="top">
     <div class="brand">
-      <svg width="20" height="24" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2v20"/><path d="M4 3h13l-4 5 4 5H4"/></svg>
-      <span>Amelia's Babysitting Service</span>
+      <span class="mark" aria-hidden="true">
+        <svg width="18" height="20" viewBox="0 0 20 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20"/><path d="M4 3h13l-4 5 4 5H4"/></svg>
+      </span>
+      <span class="brand-copy">
+        <span class="brand-name">Amelia's</span>
+        <span class="brand-sub">Babysitting Service</span>
+      </span>
     </div>
     <div class="who">
-      <span class="who-label" id="who-label">Booking as</span>
+      <span class="who-label" id="who-label">Booking As</span>
       <div class="who-list" id="who" role="group" aria-labelledby="who-label"></div>
     </div>
   </header>
@@ -180,14 +260,20 @@
   </div>
 
   <section class="inspector" id="inspector" data-on="false" aria-label="Release inspector">
-    <dl class="facts" id="facts"></dl>
-    <p class="why" id="why"></p>
+    <div class="insp-top">
+      <div>
+        <p class="insp-kicker">LaunchDarkly Is Serving</p>
+        <p class="insp-who" id="insp-who"></p>
+      </div>
+      <p class="why" id="why"></p>
+    </div>
+    <div class="facts" id="facts"></div>
     <details class="api">
-      <summary>Show API response</summary>
-      <pre id="raw">Waiting for the first response...</pre>
+      <summary>Show API Response</summary>
+      <pre id="raw">Waiting For The First Response...</pre>
     </details>
     <div class="insp-foot">
-      <span>The page asks the server for this shopper's flag values every 2 seconds.</span>
+      <span>Updates Every 2 Seconds · v<span id="insp-version">—</span></span>
       <span id="checked"></span>
     </div>
   </section>
@@ -196,19 +282,24 @@
 
   <div class="layout">
     <main class="checkout" id="checkout">
-      <p class="loading">Connecting to LaunchDarkly...</p>
+      <p class="loading">Connecting To LaunchDarkly...</p>
     </main>
 
     <div class="side">
       <aside class="summary" aria-label="Booking summary">
-        <h2>Booking summary</h2>
+        <h2>Booking Summary</h2>
         <div id="items"></div>
-        <div class="ship"><span>Travel fee</span><span>Free</span></div>
+        <div class="ship"><span>Travel Fee</span><span>Free</span></div>
         <div class="totals"><span>Total</span><span id="total"></span></div>
       </aside>
 
+      <section class="assistant" id="booking" aria-labelledby="booking-title">
+        <h2 id="booking-title">Book A Sitter</h2>
+        <div id="booking-body"></div>
+      </section>
+
       <section class="assistant" id="assistant" aria-labelledby="assistant-title">
-        <h2 id="assistant-title">Ask about your booking</h2>
+        <h2 id="assistant-title">Ask About Your Booking</h2>
         <div id="assistant-body"></div>
         <div class="ks" id="ks"></div>
       </section>
@@ -219,9 +310,9 @@
 <script>
 (() => {
   const CART = [
-    { name: "Friday evening sitter", note: "4 hours, 6–10pm", qty: 1, price: 96.00 },
-    { name: "Weekend afternoon backup", note: "Saturday, 3 hours", qty: 1, price: 72.00 },
-    { name: "Overnight add-on", note: "Same-day extension", qty: 1, price: 45.00 }
+    { name: "Friday Evening Sitter", note: "4 Hours, 6–10pm", qty: 1, price: 96.00 },
+    { name: "Weekend Afternoon Backup", note: "Saturday, 3 Hours", qty: 1, price: 72.00 },
+    { name: "Overnight Add-On", note: "Same-Day Extension", qty: 1, price: 45.00 }
   ];
   const TOTAL = CART.reduce((sum, i) => sum + i.qty * i.price, 0);
 
@@ -231,7 +322,8 @@
     { id: "liam",   name: "Liam Carter",  org: "org-bright", orgName: "Parkside Parents Co-op",       tier: "free",       role: "parent" }
   ];
 
-  const QUESTIONS = ["Can I change the sitter time?", "What are your cancellation rules?", "Are your sitters background-checked?"];
+  const QUESTIONS = ["Can I Change The Sitter Time?", "What Are Your Cancellation Rules?", "Are Your Sitters Background-Checked?"];
+  const BOOKING_ASK = "I need a sitter Saturday evening for two kids, about 4 hours.";
 
   const REASONS = {
     OFF: "Targeting is off for this flag, so everyone gets the off variation.",
@@ -246,14 +338,16 @@
   const money = (n) => "$" + n.toFixed(2);
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const first = (name) => name.split(" ")[0];
+  const planName = (tier) => String(tier || "").replace(/^./, (c) => c.toUpperCase());
 
   const state = {
     shopper: SHOPPERS[0], data: null, enabled: null, step: 0, placed: null, inflight: false, toastTimer: null,
-    config: { can_toggle: false, assistant_flag: "ai-assistant-enabled", live_model: false },
-    assistantEnabled: null, answer: null, asking: false, ksBusy: false
+    config: { can_toggle: false, assistant_flag: "ai-assistant-enabled", judge_key: "babysitting-service-reply-accuracy", live_model: false, booking_helper: false },
+    assistantEnabled: null, answer: null, asking: false, ksBusy: false,
+    booking: null, bookingReply: null, bookingAsking: false
   };
 
-  const params = (s) => new URLSearchParams({ user: s.id, name: s.name, org: s.org, tier: s.tier, role: s.role });
+  const params = (s) => new URLSearchParams({ user: s.id, name: s.name, org: s.org, tier: s.tier, plan: s.tier, role: s.role });
 
   // Every POST carries a custom header. The server rejects POSTs without it, which stops
   // other websites from making your browser call this local app.
@@ -262,7 +356,7 @@
   // ---------- Static pieces ----------
   function renderSummary() {
     $("#items").innerHTML = CART.map((i) =>
-      `<div class="item"><div>${esc(i.name)}<small>${esc(i.note)}, quantity ${i.qty}</small></div><div>${money(i.qty * i.price)}</div></div>`
+      `<div class="item"><div>${esc(i.name)}<small>${esc(i.note)}, Quantity ${i.qty}</small></div><div>${money(i.qty * i.price)}</div></div>`
     ).join("");
     $("#total").textContent = money(TOTAL);
   }
@@ -270,7 +364,7 @@
   function renderShoppers() {
     $("#who").innerHTML = SHOPPERS.map((s) =>
       `<button type="button" class="who-btn" aria-pressed="${s.id === state.shopper.id}" data-id="${s.id}">
-         <b>${esc(s.name)}</b><span>${esc(s.orgName)}, ${esc(s.tier)} plan</span>
+         <b>${esc(first(s.name))}</b><span>${esc(planName(s.tier))} Plan</span>
        </button>`
     ).join("");
   }
@@ -279,18 +373,132 @@
   function renderInspector() {
     const d = state.data, s = state.shopper;
     $("#inspector").dataset.on = String(d.enabled);
+    $("#insp-who").textContent = first(s.name) + " · " + planName(s.tier) + " Plan";
+    const ver = $("#insp-version");
+    if (ver) ver.textContent = d.app_version || "—";
     $("#facts").innerHTML = `
-      <div><dt>Deployed version</dt><dd>${esc(d.app_version)}</dd></div>
-      <div><dt>Feature flag ${esc(d.flag)}</dt><dd><span class="pill" data-state="${d.enabled ? "on" : "off"}">${d.enabled ? "On" : "Off"}</span></dd></div>
-      <div><dt>Booking flow this shopper sees</dt><dd>${esc(d.flow)}</dd></div>
-      <div><dt>AI assistant kill switch ${esc(state.config.assistant_flag)}</dt><dd><span class="pill" data-state="${d.assistant_enabled ? "on" : "off"}">${d.assistant_enabled ? "On" : "Off"}</span></dd></div>
-      <div><dt>Context sent to LaunchDarkly</dt><dd>${esc(s.name)} (${esc(s.role)}) at ${esc(s.orgName)}, ${esc(s.tier)}</dd></div>`;
+      <article class="fact">
+        <div class="kicker">Checkout</div>
+        <div class="value">${esc(shortFlow(d.flow))}</div>
+        <span class="pill" data-state="${d.enabled ? "on" : "off"}">${d.enabled ? "On" : "Off"}</span>
+      </article>
+      <article class="fact">
+        <div class="kicker">Assistant</div>
+        <div class="value">${d.assistant_enabled ? "Available" : "Off"}</div>
+        <span class="pill" data-state="${d.assistant_enabled ? "on" : "off"}">${d.assistant_enabled ? "On" : "Off"}</span>
+      </article>
+      <article class="fact">
+        <div class="kicker">Booking Agent</div>
+        <div class="value">${bookingHeadline()}</div>
+        ${bookingFact()}
+      </article>
+      <article class="fact">
+        <div class="kicker">Accuracy</div>
+        <div class="value">${accuracyHeadline()}</div>
+        ${judgeFact()}
+      </article>`;
     $("#why").textContent = REASONS[d.reason_kind] || d.reason;
-    $("#raw").textContent = JSON.stringify(d, null, 2);
+    $("#raw").textContent = JSON.stringify({ checkout: d, booking: state.booking, assistant: state.answer }, null, 2);
+  }
+
+  function shortFlow(flow) {
+    if (!flow) return "—";
+    if (String(flow).includes("one-page")) return "One-Page Booking";
+    if (String(flow).includes("classic")) return "Classic Booking";
+    return flow;
+  }
+
+  function plainReply(text) {
+    return String(text || "").replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
+  }
+
+  function prettyLabel(key) {
+    const names = {
+      "full-booking-agent": "Full Booking Agent",
+      assistant: "Assistant",
+      create_booking: "Create Booking",
+      find_available_sitters: "Find Sitters",
+      quote_price: "Quote Price"
+    };
+    if (!key) return "—";
+    if (names[key]) return names[key];
+    return String(key).replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function bookingHeadline() {
+    const b = state.booking;
+    if (!b) return "Checking…";
+    if (!b.ok && b.error && !b.variation) return "Unavailable";
+    return prettyLabel(b.variation);
+  }
+
+  function accuracyHeadline() {
+    const d = state.answer;
+    if (!d || (!d.ok && d.error && d.judge_score == null)) return "Not Scored";
+    if (d.judge_error && d.judge_score == null) return "Error";
+    if (d.judge_score == null) return "Not Scored";
+    return Math.round(d.judge_score * 100) + "%";
+  }
+
+  function judgeBlock(d) {
+    if (!d.judge_key && d.judge_score == null && !d.judge_error) return "";
+    if (d.judge_error) {
+      return `<div class="why-card"><p class="kicker">Accuracy Judge</p><p class="body">${esc(d.judge_error)}</p></div>`;
+    }
+    const pct = d.judge_score == null ? "—" : Math.round(d.judge_score * 100) + "%";
+    const pass = d.judge_score != null && d.judge_score >= 0.6;
+    const verdict = d.judge_score == null ? "No Score"
+      : pass ? "Matches Official Facts" : "Invented Or Missing Facts";
+    const reason = d.judge_reasoning
+      ? `<div class="why-card"><p class="kicker">Why</p><p class="body">${esc(d.judge_reasoning)}</p></div>`
+      : "";
+    return `<div class="result-score" data-pass="${pass}">
+        <div class="result-pct">${esc(pct)}</div>
+        <div class="result-copy">
+          <div class="label">Accuracy</div>
+          <div class="verdict">${esc(verdict)}</div>
+        </div>
+      </div>${reason}`;
+  }
+
+  function answerBlock(d) {
+    const chips = [
+      d.variation ? `<span class="chip">${esc(d.variation)}</span>` : "",
+      `<span class="chip">${esc(shortModel(d.model))}</span>`,
+      d.live ? `<span class="chip">Live</span>` : `<span class="chip">Simulated</span>`
+    ].filter(Boolean).join("");
+    return `<div class="result">
+      <div class="chips">${chips}</div>
+      ${judgeBlock(d)}
+      <div class="reply-card"><p class="kicker">Reply</p><p class="body">${esc(d.reply)}</p></div>
+    </div>`;
+  }
+
+  function shortModel(name) {
+    if (!name) return "unknown";
+    return String(name).replace(/^claude-/, "").replace(/-20\d{6}$/, "");
+  }
+
+  function judgeFact() {
+    const d = state.answer;
+    if (!d || (d.judge_score == null && !d.judge_error)) {
+      return `<span class="pill" data-state="off">Ask To Score</span>`;
+    }
+    if (d.judge_error) return `<span class="pill" data-state="off">Error</span>`;
+    const pass = d.judge_score >= 0.6;
+    const label = (d.variation ? d.variation + " · " : "") + (pass ? "Pass" : "Fail");
+    return `<span class="pill" data-state="${pass ? "on" : "off"}">${esc(label)}</span>`;
+  }
+
+  function bookingFact() {
+    const b = state.booking;
+    if (!b) return `<span class="pill" data-state="off">Checking</span>`;
+    if (!b.ok && b.error && !b.variation) return `<span class="pill" data-state="off">Down</span>`;
+    return `<span class="pill" data-state="${b.can_book ? "on" : "off"}">${b.can_book ? "Can Book" : "Quotes Only"}</span>`;
   }
 
   function markChecked() {
-    $("#checked").textContent = "Last checked " + new Date().toLocaleTimeString();
+    $("#checked").textContent = "Last Checked " + new Date().toLocaleTimeString();
   }
 
   function toast(message) {
@@ -299,6 +507,102 @@
     t.hidden = false;
     clearTimeout(state.toastTimer);
     state.toastTimer = setTimeout(() => { t.hidden = true; }, 8000);
+  }
+
+  // ---------- Booking agent (LaunchDarkly AgentControl config) ----------
+  function renderBooking() {
+    const body = $("#booking-body");
+    const typedEl = document.querySelector("#bq");
+    const typed = (typedEl && typedEl.value) || BOOKING_ASK;
+    const b = state.booking;
+
+    if (!state.config.booking_helper && !b) {
+      body.innerHTML = `<p class="sub">Start this page with <code>./run.sh web</code> so the booking agent sidecar can evaluate <code>booking-helper</code>.</p>`;
+      return;
+    }
+    if (!b) {
+      body.innerHTML = `<p class="sub">Checking which booking-helper variation LaunchDarkly serves this parent...</p>`;
+      return;
+    }
+    if (!b.ok && b.error && !b.variation) {
+      body.innerHTML = `<div class="off"><p><b>Booking agent unavailable.</b></p><p>${esc(b.error)}</p></div>`;
+      return;
+    }
+
+    const tools = (b.tools || []).map((t) => `<span class="tool">${esc(prettyLabel(t))}</span>`).join("")
+      || `<span class="tool">No Tools</span>`;
+    const chips = [
+      b.variation ? `<span class="chip">${esc(prettyLabel(b.variation))}</span>` : "",
+      b.live ? `<span class="chip">Live</span>` : `<span class="chip">Simulated</span>`
+    ].filter(Boolean).join("");
+    const can = !!b.can_book;
+    const booked = !!b.booked;
+    const reply = state.bookingReply
+      ? `<div class="result">
+          <div class="reply-card"><p class="kicker">Agent Reply</p><p class="body reply">${esc(plainReply(state.bookingReply))}</p></div>
+        </div>`
+      : "";
+    const confirmDisabled = state.bookingAsking || !can ? "disabled" : "";
+    body.innerHTML = `
+      <p class="sub">LaunchDarkly picks the agent variation for this parent. Tools come with that variation.</p>
+      <div class="chips">${chips}</div>
+      <div class="result-score capability" data-pass="${booked || can}">
+        <div class="result-pct">${booked ? "Booked" : can ? "Can Book" : "Quotes Only"}</div>
+        <div class="result-copy">
+          <div class="verdict">${booked ? "The Book Tool Ran After You Confirmed." : can ? "Search, Quote, Then Confirm." : "Search And Quote. Cannot Book."}</div>
+        </div>
+      </div>
+      <div class="reply-card tool-card">
+        <p class="kicker">Tools</p>
+        <div class="tools">${tools}</div>
+      </div>
+      <div class="booking-ask">
+        <label class="sr" for="bq">Booking Request</label>
+        <input id="bq" maxlength="500" value="${esc(typed)}" autocomplete="off">
+        <div class="booking-actions">
+          <button type="button" class="btn" data-book="ask" ${state.bookingAsking ? "disabled" : ""}>${state.bookingAsking ? "Asking..." : "Find Sitters"}</button>
+          <button type="button" class="btn btn-secondary" data-book="confirm" ${confirmDisabled}>${can ? "Confirm Booking" : "Booking Locked"}</button>
+        </div>
+      </div>
+      <div id="booking-answer" aria-live="polite">${reply}</div>`;
+  }
+
+  async function refreshBooking() {
+    const previous = JSON.stringify(state.booking);
+    try {
+      const res = await fetch("/api/booking-status?" + params(state.shopper), { cache: "no-store" });
+      const next = await res.json();
+      state.booking = Object.assign({}, state.booking || {}, next);
+    } catch (err) {
+      state.booking = { ok: false, error: "Couldn't reach the booking agent sidecar." };
+    }
+    if (previous === JSON.stringify(state.booking)) return;
+    renderBooking();
+    if (state.data) renderInspector();
+  }
+
+  async function askBooking(confirm) {
+    const input = document.querySelector("#bq");
+    const question = ((input && input.value) || BOOKING_ASK).trim();
+    if (!question || state.bookingAsking) return;
+    if (confirm && state.booking && !state.booking.can_book) return;
+    state.bookingAsking = true;
+    renderBooking();
+    try {
+      const p = params(state.shopper);
+      p.set("question", question);
+      p.set("confirm", confirm ? "true" : "false");
+      const res = await post("/api/booking?" + p);
+      const data = await res.json();
+      state.booking = data;
+      state.bookingReply = data.reply || data.error || "";
+    } catch (err) {
+      state.bookingReply = "Check that ./run.sh web is running, then try again.";
+    } finally {
+      state.bookingAsking = false;
+      renderBooking();
+      if (state.data) renderInspector();
+    }
   }
 
   // ---------- AI assistant and kill switch ----------
@@ -314,30 +618,28 @@
     }
 
     if (!state.assistantEnabled) {
-      body.innerHTML = `<div class="off"><p><b>The AI assistant is turned off.</b></p><p>Please contact our support team for help with your booking.</p></div>`;
+      body.innerHTML = `<div class="off"><p><b>The AI Assistant Is Turned Off.</b></p><p>Please Contact Our Support Team For Help With Your Booking.</p></div>`;
     } else {
       const d = state.answer;
       let answer = "";
       if (d && d.ok) {
-        const note = d.live ? "" : " Simulated reply. Add ANTHROPIC_API_KEY for live answers.";
-        answer = `<div class="answer"><p>${esc(d.reply)}</p>
-          <p class="meta">Model ${esc(d.model)}, ${d.input_tokens} tokens in and ${d.output_tokens} out, ${d.latency_ms} ms.${esc(note)}</p></div>`;
+        answer = `<div class="answer">${answerBlock(d)}</div>`;
       } else if (d && d.ok === false) {
         answer = `<div class="answer failed"><p>The model call failed. ${esc(d.error || "")}</p></div>`;
       }
       body.innerHTML = `
-        <p class="sub">Answers come from the AI model LaunchDarkly serves to this parent.</p>
+        <p class="sub">LaunchDarkly picks the variation for this parent. The judge scores the reply against official facts.</p>
         <div class="quick">${QUESTIONS.map((q) => `<button type="button" data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
         <div class="ask">
-          <label class="sr" for="q">Your question</label>
-          <input id="q" maxlength="500" placeholder="Type a question" autocomplete="off" value="${esc(typed)}">
+          <label class="sr" for="q">Your Question</label>
+          <input id="q" maxlength="500" placeholder="Type A Question" autocomplete="off" value="${esc(typed)}">
           <button type="button" class="btn" data-ai="ask" ${state.asking ? "disabled" : ""}>${state.asking ? "Asking..." : "Ask"}</button>
         </div>
         <div id="answer" aria-live="polite">${answer}</div>`;
     }
 
     const on = state.assistantEnabled, can = state.config.can_toggle;
-    const label = state.ksBusy ? "Working..." : (on ? "Turn off AI assistant" : "Turn AI assistant back on");
+    const label = state.ksBusy ? "Working..." : (on ? "Turn Off AI Assistant" : "Turn AI Assistant Back On");
     const hint = can
       ? (on ? "Kill switch: turns the assistant off for every shopper, with no redeploy." : "The assistant is off for every shopper.")
       : `To use this button, add LD_API_TOKEN, LD_PROJECT_KEY, and LD_ENV_KEY to .env. Or flip ${esc(state.config.assistant_flag)} in the dashboard.`;
@@ -366,6 +668,7 @@
     } finally {
       state.asking = false;
       renderAssistant();
+      if (state.data) renderInspector();
     }
   }
 
@@ -390,19 +693,19 @@
   // ---------- Checkout views ----------
   const shippingFields = () => `
     <div class="fields">
-      <div class="field wide"><label for="f-name">Parent name</label><input id="f-name" value="${esc(state.shopper.name)}" autocomplete="off"></div>
-      <div class="field wide"><label for="f-street">Care address</label><input id="f-street" value="400 Main Street" autocomplete="off"></div>
+      <div class="field wide"><label for="f-name">Parent Name</label><input id="f-name" value="${esc(state.shopper.name)}" autocomplete="off"></div>
+      <div class="field wide"><label for="f-street">Care Address</label><input id="f-street" value="400 Main Street" autocomplete="off"></div>
       <div class="field"><label for="f-city">City</label><input id="f-city" value="Dallas" autocomplete="off"></div>
-      <div class="field"><label for="f-zip">Postal code</label><input id="f-zip" value="75201" autocomplete="off"></div>
+      <div class="field"><label for="f-zip">Postal Code</label><input id="f-zip" value="75201" autocomplete="off"></div>
     </div>`;
 
   const paymentFields = () => `
-    <label class="choice"><input type="radio" name="pay" checked> Visa ending 4242, expires 08/28</label>
-    <label class="choice"><input type="radio" name="pay"> Pay from family account</label>`;
+    <label class="choice"><input type="radio" name="pay" checked> Visa Ending 4242, Expires 08/28</label>
+    <label class="choice"><input type="radio" name="pay"> Pay From Family Account</label>`;
 
   const reviewRows = () => `
-    <div class="review-row"><span>Care at</span><span>${esc(state.shopper.name)}, 400 Main Street, Dallas 75201</span></div>
-    <div class="review-row"><span>Payment</span><span>Visa ending 4242</span></div>
+    <div class="review-row"><span>Care At</span><span>${esc(state.shopper.name)}, 400 Main Street, Dallas 75201</span></div>
+    <div class="review-row"><span>Payment</span><span>Visa Ending 4242</span></div>
     <div class="review-row"><span>Total</span><span>${money(TOTAL)}</span></div>`;
 
   function viewLegacy() {
@@ -412,33 +715,33 @@
     ).join("");
     let body, actions;
     if (state.step === 0) {
-      body = `<section class="panel"><h2>Care address</h2>${shippingFields()}</section>`;
-      actions = `<button class="btn" data-action="next">Continue to payment</button>`;
+      body = `<section class="panel"><h2>Care Address</h2>${shippingFields()}</section>`;
+      actions = `<button class="btn" data-action="next">Continue To Payment</button>`;
     } else if (state.step === 1) {
       body = `<section class="panel"><h2>Payment</h2>${paymentFields()}</section>`;
-      actions = `<button class="btn" data-action="next">Continue to review</button><button class="btn btn-quiet" data-action="back">Back</button>`;
+      actions = `<button class="btn" data-action="next">Continue To Review</button><button class="btn btn-quiet" data-action="back">Back</button>`;
     } else {
       body = `<section class="panel"><h2>Review</h2>${reviewRows()}</section>`;
-      actions = `<button class="btn" data-action="place">Book session</button><button class="btn btn-quiet" data-action="back">Back</button>`;
+      actions = `<button class="btn" data-action="place">Book Session</button><button class="btn btn-quiet" data-action="back">Back</button>`;
     }
-    return `<h1>Book a sitter</h1><p class="sub">Three steps: address, payment, then review.</p>
+    return `<h1>Book A Sitter</h1><p class="sub">Three Steps: Address, Payment, Then Review.</p>
       <ol class="steps" aria-label="Booking progress">${steps}</ol>${body}<div class="actions">${actions}</div>`;
   }
 
   function viewNew() {
-    return `<h1>Book a sitter</h1><p class="sub">Address, payment, and review are all on this page.</p>
-      <section class="panel"><h2>Care address</h2>${shippingFields()}</section>
+    return `<h1>Book A Sitter</h1><p class="sub">Address, Payment, And Review Are All On This Page.</p>
+      <section class="panel"><h2>Care Address</h2>${shippingFields()}</section>
       <section class="panel"><h2>Payment</h2>${paymentFields()}</section>
       <section class="panel"><h2>Review</h2>${reviewRows()}</section>
-      <div class="actions"><button class="btn" data-action="place">Book session</button></div>`;
+      <div class="actions"><button class="btn" data-action="place">Book Session</button></div>`;
   }
 
   function viewPlaced() {
     const p = state.placed;
-    return `<div class="placed"><h1>Booking confirmed</h1>
+    return `<div class="placed"><h1>Booking Confirmed</h1>
       <p>Thanks, ${esc(first(state.shopper.name))}. This booking used the ${esc(p.flow)}.</p>
       <p>LaunchDarkly received a <b>checkout-completed</b> event and ${money(p.amount)} of <b>checkout-revenue</b> for this parent. Those events feed experiments and guarded rollouts.</p>
-      <div class="actions"><button class="btn" data-action="again">Book another session</button></div></div>`;
+      <div class="actions"><button class="btn" data-action="again">Book Another Session</button></div></div>`;
   }
 
   function renderCheckout(swap) {
@@ -466,12 +769,12 @@
 
       const previous = state.enabled;
       const prevAssistant = state.assistantEnabled;
-      const changed = JSON.stringify(data) !== JSON.stringify(state.data);
       state.data = data;
       state.enabled = data.enabled;
       state.assistantEnabled = data.assistant_enabled;
 
-      if (changed) renderInspector();
+      renderInspector();
+      refreshBooking();
 
       if (prevAssistant === null) {
         renderAssistant();
@@ -547,17 +850,31 @@
     state.assistantEnabled = null;
     state.data = null;
     state.answer = null;
+    state.booking = null;
+    state.bookingReply = null;
     state.step = 0;
     state.placed = null;
     $("#toast").hidden = true;
     renderShoppers();
     renderAssistant();
+    renderBooking();
     poll();
+  });
+
+  $("#booking").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-book]");
+    if (!b) return;
+    if (b.dataset.book === "ask") askBooking(false);
+    else if (b.dataset.book === "confirm") askBooking(true);
+  });
+  $("#booking").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target && e.target.id === "bq") askBooking(false);
   });
 
   renderSummary();
   renderShoppers();
   renderAssistant();
+  renderBooking();
   fetch("/api/config").then((r) => r.json()).then((cfg) => {
     state.config = cfg;
     renderAssistant();

@@ -1,4 +1,7 @@
 .env
+booking/.venv/
+__pycache__/
+*.pyc
 target/
 .DS_Store
 *.class

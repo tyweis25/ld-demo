@@ -7,9 +7,15 @@ import com.launchdarkly.sdk.ObjectBuilder;
 import com.launchdarkly.sdk.server.LDClient;
 import com.launchdarkly.sdk.server.ai.AICompletionConfig;
 import com.launchdarkly.sdk.server.ai.AICompletionConfigDefault;
+import com.launchdarkly.sdk.server.ai.AIJudgeConfig;
+import com.launchdarkly.sdk.server.ai.AIJudgeConfigDefault;
+import com.launchdarkly.sdk.server.ai.Judge;
 import com.launchdarkly.sdk.server.ai.LDAIClient;
 import com.launchdarkly.sdk.server.ai.LDAIConfigTracker;
+import com.launchdarkly.sdk.server.ai.RunnerResult;
 import com.launchdarkly.sdk.server.ai.datamodel.LDAITrackingTypes;
+import com.launchdarkly.sdk.server.ai.datamodel.LDAITrackingTypes.AIMetrics;
+import com.launchdarkly.sdk.server.ai.datamodel.LDAITrackingTypes.JudgeResult;
 
 import java.lang.reflect.Method;
 import java.net.URI;
@@ -28,6 +34,8 @@ import java.util.Map;
  * Two LaunchDarkly controls wrap every question:
  *   1. The KILL SWITCH flag (ai-assistant-enabled). Off means no AI call happens at all.
  *   2. The AI CONFIG (support-assistant). LaunchDarkly picks the model, prompt, and parameters per shopper.
+ *   3. The ACCURACY JUDGE (babysitting-service-reply-accuracy). After a reply, LaunchDarkly serves the judge config and
+ *      this class scores the Q&A. The Java AI SDK does not run UI-attached judges by itself.
  *
  * NOTE: the Java AI SDK is pre-1.0. The model name and messages are read by reflection (see the helpers
  * at the bottom), so a renamed getter won't break the build.
@@ -35,6 +43,7 @@ import java.util.Map;
 final class AiAssistant {
 
     static final String CONFIG_KEY = "support-assistant";
+    static final String JUDGE_KEY = "babysitting-service-reply-accuracy";
     static final String KILL_SWITCH_FLAG = "ai-assistant-enabled";
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -46,23 +55,40 @@ final class AiAssistant {
         final boolean available;   // false when the kill switch or the AI Config is off
         final String reason;       // why it's unavailable
         final String model;
+        final String variation;
         final String text;
         final String error;        // set when the model call failed
         final int inputTokens;
         final int outputTokens;
         final long latencyMs;
         final boolean live;        // true when a real model answered
+        final Double judgeScore;   // 0.0-1.0 when the accuracy judge ran
+        final String judgeReasoning;
+        final String judgeKey;
+        final boolean judgeLive;
+        final String judgeError;
 
-        private Answer(boolean available, String reason, String model, String text, String error,
-                       int inputTokens, int outputTokens, long latencyMs, boolean live) {
-            this.available = available; this.reason = reason; this.model = model; this.text = text;
-            this.error = error; this.inputTokens = inputTokens; this.outputTokens = outputTokens;
+        private Answer(boolean available, String reason, String model, String variation, String text, String error,
+                       int inputTokens, int outputTokens, long latencyMs, boolean live,
+                       Double judgeScore, String judgeReasoning, String judgeKey, boolean judgeLive, String judgeError) {
+            this.available = available; this.reason = reason; this.model = model; this.variation = variation;
+            this.text = text; this.error = error; this.inputTokens = inputTokens; this.outputTokens = outputTokens;
             this.latencyMs = latencyMs; this.live = live;
+            this.judgeScore = judgeScore; this.judgeReasoning = judgeReasoning;
+            this.judgeKey = judgeKey; this.judgeLive = judgeLive; this.judgeError = judgeError;
         }
-        static Answer unavailable(String reason) { return new Answer(false, reason, null, null, null, 0, 0, 0, false); }
-        static Answer failed(String model, String error) { return new Answer(true, null, model, null, error, 0, 0, 0, false); }
-        static Answer ok(String model, String text, int in, int out, long ms, boolean live) {
-            return new Answer(true, null, model, text, null, in, out, ms, live);
+        static Answer unavailable(String reason) {
+            return new Answer(false, reason, null, null, null, null, 0, 0, 0, false, null, null, null, false, null);
+        }
+        static Answer failed(String model, String error) {
+            return new Answer(true, null, model, null, null, error, 0, 0, 0, false, null, null, null, false, null);
+        }
+        static Answer ok(String model, String variation, String text, int in, int out, long ms, boolean live) {
+            return new Answer(true, null, model, variation, text, null, in, out, ms, live, null, null, null, false, null);
+        }
+        Answer withJudge(Double score, String reasoning, String key, boolean liveJudge, String error) {
+            return new Answer(available, reason, model, variation, text, this.error, inputTokens, outputTokens, latencyMs, live,
+                    score, reasoning, key, liveJudge, error);
         }
     }
 
@@ -83,6 +109,7 @@ final class AiAssistant {
         }
 
         String model = modelName(config);
+        String variation = variationKey(config);
         boolean live = anthropicKey != null && !anthropicKey.isBlank();
 
         // 3. Call the model, timing it and recording tokens against this config variation.
@@ -94,7 +121,7 @@ final class AiAssistant {
             tracker.trackTokens(new LDAITrackingTypes.TokenUsage(
                     r.inputTokens + r.outputTokens, r.inputTokens, r.outputTokens));
             tracker.trackSuccess();
-            return Answer.ok(model, r.text, r.inputTokens, r.outputTokens, ms, live);
+            return score(aiClient, ctx, question, Answer.ok(model, variation, r.text, r.inputTokens, r.outputTokens, ms, live), anthropicKey);
         } catch (Exception e) {
             tracker.trackError();
             String why = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -103,6 +130,108 @@ final class AiAssistant {
     }
 
     // ------------------------------------------------------------------------------------------
+
+    /**
+     * Score the assistant reply with the babysitting-service-reply-accuracy judge. The Java AI SDK does not run
+     * UI-attached judges, so this invokes the judge config directly after each successful answer.
+     */
+    private static Answer score(LDAIClient aiClient, LDContext ctx, String question, Answer answer, String apiKey) {
+        try {
+            AIJudgeConfig judgeCfg = aiClient.judgeConfig(
+                    JUDGE_KEY, ctx, AIJudgeConfigDefault.disabled(), Map.of());
+            if (!judgeCfg.isEnabled()) {
+                Map<String, Object> parsed = simulatedJudgeParsed(answer.text);
+                return answer.withJudge(
+                        ((Number) parsed.get("score")).doubleValue(),
+                        parsed.get("reasoning") + " LaunchDarkly did not serve " + JUDGE_KEY + " (create it and turn targeting on).",
+                        JUDGE_KEY,
+                        false,
+                        null);
+            }
+            boolean liveJudge = apiKey != null && !apiKey.isBlank();
+            JudgeResult result = new Judge(judgeCfg, (input, schema) -> liveJudge
+                    ? liveJudgeRun(judgeCfg, input, apiKey)
+                    : simulatedJudgeRun(answer.text), null)
+                    .evaluate(question, answer.text);
+            if (result.isSuccess() && result.getScore() != null) {
+                return answer.withJudge(result.getScore(), result.getReasoning(), JUDGE_KEY, liveJudge, null);
+            }
+            String why = result.getErrorMessage() != null
+                    ? result.getErrorMessage()
+                    : "Accuracy judge did not return a score.";
+            return answer.withJudge(null, null, JUDGE_KEY, liveJudge, why);
+        } catch (RuntimeException e) {
+            String why = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return answer.withJudge(null, null, JUDGE_KEY, false, why);
+        }
+    }
+
+    static Map<String, Object> simulatedJudgeParsed(String output) {
+        Map<String, Object> parsed = new HashMap<>();
+        String text = output == null ? "" : output.toLowerCase();
+        if (text.contains("[simulated reply]") || text.contains("add an anthropic_api_key")) {
+            parsed.put("score", 0.2);
+            parsed.put("reasoning", "This is a stub reply, not an accurate answer about the babysitting service.");
+        } else {
+            parsed.put("score", 0.7);
+            parsed.put("reasoning", "Simulated accuracy score. Add ANTHROPIC_API_KEY so the judge can score a live answer.");
+        }
+        return parsed;
+    }
+
+    static Map<String, Object> parseJudgeJson(String text) {
+        if (text == null) return null;
+        String raw = text.trim();
+        int start = raw.indexOf('{');
+        int end = raw.lastIndexOf('}');
+        if (start < 0 || end <= start) return null;
+        try {
+            LDValue json = LDValue.parse(raw.substring(start, end + 1));
+            if (!json.get("score").isNumber()) return null;
+            Map<String, Object> parsed = new HashMap<>();
+            parsed.put("score", json.get("score").doubleValue());
+            if (json.get("reasoning").isString()) {
+                parsed.put("reasoning", json.get("reasoning").stringValue());
+            }
+            return parsed;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static RunnerResult simulatedJudgeRun(String output) {
+        Map<String, Object> parsed = simulatedJudgeParsed(output);
+        return RunnerResult.builder(
+                "{\"score\":" + parsed.get("score") + "}",
+                AIMetrics.builder().success(true).durationMs(5L).build())
+                .parsed(parsed)
+                .build();
+    }
+
+    private static RunnerResult liveJudgeRun(AIJudgeConfig judgeCfg, String input, String apiKey) {
+        String model = modelName(judgeCfg);
+        StringBuilder system = new StringBuilder();
+        for (String[] m : messages(judgeCfg)) {
+            system.append(m[1]).append('\n');
+        }
+        if (system.length() == 0) {
+            system.append("Score whether the babysitting-support reply is factually accurate for the parent's question.\n");
+        }
+        system.append("Reply with JSON only: {\"score\": <number 0.0-1.0>, \"reasoning\": \"<short reason>\"}.");
+
+        ModelResult raw = callAnthropic(model, system.toString().trim(), input, apiKey);
+        Map<String, Object> parsed = parseJudgeJson(raw.text);
+        if (parsed == null) {
+            throw new RuntimeException("Accuracy judge did not return JSON with a score.");
+        }
+        return RunnerResult.builder(raw.text, AIMetrics.builder()
+                        .success(true)
+                        .tokens(new LDAITrackingTypes.TokenUsage(
+                                raw.inputTokens + raw.outputTokens, raw.inputTokens, raw.outputTokens))
+                        .build())
+                .parsed(parsed)
+                .build();
+    }
 
     private static ModelResult callModel(AICompletionConfig config, String model, String question, String apiKey) {
         if (apiKey == null || apiKey.isBlank()) {
@@ -124,12 +253,28 @@ final class AiAssistant {
             }
             messages.add(LDValue.buildObject().put("role", "user").put("content", question).build());
 
-            ObjectBuilder body = LDValue.buildObject()
-                    .put("model", model)
-                    .put("max_tokens", 400)
-                    .put("messages", messages.build());
-            if (system.length() > 0) body.put("system", system.toString().trim());
+            return callAnthropic(model, system.toString().trim(), messages.build(), apiKey);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
+    private static ModelResult callAnthropic(String model, String system, String user, String apiKey) {
+        ArrayBuilder messages = LDValue.buildArray()
+                .add(LDValue.buildObject().put("role", "user").put("content", user).build());
+        return callAnthropic(model, system, messages.build(), apiKey);
+    }
+
+    private static ModelResult callAnthropic(String model, String system, LDValue messages, String apiKey) {
+        ObjectBuilder body = LDValue.buildObject()
+                .put("model", model)
+                .put("max_tokens", 400)
+                .put("messages", messages);
+        if (system != null && !system.isBlank()) body.put("system", system);
+
+        try {
             HttpRequest request = HttpRequest.newBuilder(URI.create(ANTHROPIC_URL))
                     .timeout(Duration.ofSeconds(60))
                     .header("x-api-key", apiKey)
@@ -164,7 +309,15 @@ final class AiAssistant {
      * If a getter gets renamed, the project still compiles and the assistant falls back gracefully
      * instead of breaking the whole build.
      */
-    private static String modelName(AICompletionConfig config) {
+    private static String variationKey(Object config) {
+        Object key = read(config, "getVariationKey", "getKey");
+        if (key != null && !String.valueOf(key).isBlank()) return String.valueOf(key);
+        Object meta = read(config, "getMeta");
+        Object fromMeta = read(meta, "getVariationKey", "variationKey");
+        return fromMeta == null ? null : String.valueOf(fromMeta);
+    }
+
+    private static String modelName(Object config) {
         Object model = read(config, "getModel");
         Object name = read(model, "getName", "getId", "name");
         if (name != null) return String.valueOf(name);
@@ -172,7 +325,7 @@ final class AiAssistant {
     }
 
     /** Messages from the AI Config as [role, content] pairs. */
-    private static List<String[]> messages(AICompletionConfig config) {
+    private static List<String[]> messages(Object config) {
         List<String[]> out = new ArrayList<>();
         Object list = read(config, "getMessages");
         if (!(list instanceof Iterable)) return out;

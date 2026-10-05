@@ -1,36 +1,161 @@
-# LaunchDarkly Java Demo: Amelia's Babysitting Service
+# Amelia's Babysitting Service
 
-Five pieces, one story:
+A LaunchDarkly demo: a Java booking site that changes **who sees what** without a redeploy. Targeting decides who gets a feature, experiments prove it is better, guarded rollouts prove it is safe, and kill switches undo it instantly.
 
-1. `FeatureFlagDemo` - roll out a new booking flow **account by account** using multi-contexts (user + organization), with evaluation reasons, metric events, and a live flag change.
-2. `TrafficSimulator` - generates realistic booking traffic so LaunchDarkly has data for an **experiment** and a **guarded rollout**.
-3. `AiConfigDemo` (extra credit) - an AI support assistant whose model and prompt come from an AI Config, with live model calls, real token metrics, and a kill switch.
-4. `CheckoutService` - a web front end (Amelia's Babysitting Service) that switches booking layouts live when you change the flag, sends real booking events, and includes an AI assistant with a kill switch button.
-5. The LaunchDarkly UI - experiment results and a guarded rollout that automatically rolls back a bad release.
+The browser never talks to LaunchDarkly and never sees your SDK key. A local Java server evaluates flags and AI configs, then returns results to the page.
 
-The storyline: **targeting** decides who gets it, **experiments** prove it's better, **guarded rollouts** prove it's safe, and **kill switches** undo it instantly.
+## What you can show
+
+| Story | What it uses | Where you see it |
+|---|---|---|
+| Account-level rollout | Boolean flag `new-checkout-flow` | Web page + `./run.sh flags` |
+| Experiment (is it better?) | Same flag + `checkout-completed` / `checkout-revenue` | `./run.sh experiment` then the LaunchDarkly experiment UI |
+| Guarded rollout (is it safe?) | Boolean flag `new-payment-service` + `checkout-error` | `./run.sh guarded` then the LaunchDarkly rollout UI |
+| AI support assistant | Kill switch `ai-assistant-enabled` + completion config `support-assistant` | Web page Ask panel + `./run.sh ai` |
+| Accuracy judge | Judge config `babysitting-service-reply-accuracy` | Accuracy card on the web page after Ask |
+| Booking agent | Agent config `booking-helper` (Python sidecar) | Book A Sitter panel on the web page + `./run.sh booking` |
+
+The web app is the main demo surface: `./run.sh web` then open [http://localhost:8080](http://localhost:8080).
+
+## Architecture
+
+```
+Browser (index.html)
+        |  GET/POST localhost:8080   header X-LD-Demo on POSTs
+        v
+Java CheckoutService          Python booking_helper.py
+  LD Java server SDK            LD Python server SDK
+  LD Java AI SDK 0.3.0          LD Python AI SDK 0.2.4
+        |                              |
+        +------ LaunchDarkly ----------+
+        |  flags, AI configs, events   |
+        v
+  Anthropic (optional, if ANTHROPIC_API_KEY is set)
+```
+
+- **Java** evaluates feature flags, the support assistant (`completion` mode), and the accuracy judge. It cannot run AgentControl **agent** mode.
+- **Python** evaluates `booking-helper` in agent mode, runs tools (`find_available_sitters`, `quote_price`, `create_booking`), and returns JSON. Java proxies `/api/booking-status` and `/api/booking` to `http://127.0.0.1:8081`.
+- `./run.sh web` starts both processes and stops the sidecar when you Ctrl+C.
+
+HTML is loaded once at Java startup (`CheckoutService.loadPage()`). After you edit `src/main/resources/web/index.html`, restart `./run.sh web`.
 
 ## Prerequisites
 
 - JDK 11+ and Maven
-- A LaunchDarkly account (trial works; all accounts include a limited trial of guarded rollouts)
-- Your **server-side SDK key** (Project settings > Environments). Not the client-side ID or mobile key.
-- Optional: `ANTHROPIC_API_KEY` for live AI calls
+- Python 3 (for the booking sidecar). A venv at `booking/.venv` is used automatically if present
+- A LaunchDarkly account and a **server-side SDK key** (Project settings → Environments). Not the client-side ID
+- Optional: `ANTHROPIC_API_KEY` for live model calls. Without it, the assistant and booking agent still evaluate configs and return simulated replies
 
-## Setup in the LaunchDarkly UI
+## Setup
 
-### 1. Context kind
-The code sends a multi-context with kinds `user` and `organization`. LaunchDarkly usually creates the `organization` kind automatically the first time it sees it. Run `FeatureFlagDemo` once, then check **Contexts** to confirm Amelia's Babysitting Service shows up as an organization.
+1. Copy `.env.example` to `.env` and fill in keys. Never commit `.env`.
+2. Confirm the toolchain:
 
-### 2. Feature flag with account-level targeting
-1. Create a **boolean** flag `new-checkout-flow`.
-2. Add a rule: context kind **organization**, attribute `tier`, `is one of`, `enterprise`, serve `true`.
-3. Default rule: `false`. Turn targeting On and save.
+   ```bash
+   ./run.sh check
+   ./run.sh build
+   ```
 
-Result: Amelia (admin) and Harper (buyer) both get the new flow because their **account** is enterprise. Liam's startup doesn't. That's account-level targeting.
+3. Create the LaunchDarkly objects below (or reuse ones already in project `default`, environment `test`).
+4. Start the page:
 
-### 3. Metrics
-Create three metrics (Metrics > Create), all with **randomization unit = user**:
+   ```bash
+   ./run.sh web
+   ```
+
+   Open [http://localhost:8080](http://localhost:8080). Logs print in that terminal (sidecar access lines and Java flag-change / kill-switch lines).
+
+### Environment variables
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `LD_SDK_KEY` | Yes | Server-side SDK. Reads flags and AI configs |
+| `ANTHROPIC_API_KEY` | No | Live Claude calls. Simulated replies if unset |
+| `LD_API_TOKEN` | No | Makes the kill-switch button work (REST, not the SDK) |
+| `LD_PROJECT_KEY` | With token | Usually `default` |
+| `LD_ENV_KEY` | With token | Must match the SDK key’s environment (`test`, `production`, …) |
+| `LD_API_BASE` | No | EU accounts: `https://app.eu.launchdarkly.com` |
+| `PORT` | No | Java HTTP port, default `8080` |
+| `HOST` | No | Bind address, default `127.0.0.1` |
+| `FLAG_KEY` | No | Checkout flag, default `new-checkout-flow` |
+| `APP_VERSION` | No | Shown in the inspector, default `1.0.0` |
+| `BOOKING_PORT` | No | Sidecar port, default `8081` |
+| `BOOKING_HELPER_URL` | Set by `run.sh web` | `http://127.0.0.1:${BOOKING_PORT}` |
+
+`LD_API_TOKEN` is not an SDK key. The SDK key can only read. The token can change targeting. Use the narrowest role you can and delete the token after the demo.
+
+## How the SDKs are pulled in
+
+Maven downloads the Java SDKs from Maven Central when you compile. Versions live in `pom.xml`:
+
+```xml
+<ld.server.version>7.17.2</ld.server.version>
+<ld.ai.version>0.3.0</ld.ai.version>
+```
+
+| Artifact | Role |
+|---|---|
+| `com.launchdarkly:launchdarkly-java-server-sdk` | Flags, multi-contexts, evaluation reasons, `track()` events |
+| `com.launchdarkly:launchdarkly-java-server-sdk-ai` | `completionConfig`, `judgeConfig`, AI metrics |
+
+`CheckoutService` builds one `LDClient` (waits up to 5 seconds) and wraps it with `LDAIClientImpl`.
+
+The booking sidecar installs Python packages from `booking/requirements.txt`:
+
+```
+launchdarkly-server-sdk>=9.0.0
+launchdarkly-ai-server==0.2.4
+launchdarkly-ai-claude-agents==0.2.4
+```
+
+Create a venv once if you want it isolated:
+
+```bash
+python3 -m venv booking/.venv
+booking/.venv/bin/pip install -r booking/requirements.txt
+```
+
+`./run.sh web` prefers `booking/.venv/bin/python` when that file exists.
+
+## Shoppers (multi-context)
+
+Every evaluation is a **user + organization** multi-context. Account-level rules target `organization.tier`. AI and booking rules target `user.plan`. The page sends `plan` equal to the org `tier` so those stay in sync.
+
+| Shopper | User key | Role | Org | Tier / plan |
+|---|---|---|---|---|
+| Amelia Smith | `user-amelia` | admin | `org-ld` Amelia's Babysitting Service | enterprise |
+| Harper Reed | `user-harper` | parent | same org as Amelia | enterprise |
+| Liam Carter | `user-liam` | parent | `org-bright` Parkside Parents Co-op | free |
+
+Harper proves the checkout flag is **account** targeting: she is not an admin, but she still gets the enterprise flow.
+
+## LaunchDarkly objects the code expects
+
+### Feature flags
+
+**`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
+
+1. Rule: context kind **organization**, attribute `tier`, is one of `enterprise` → `true`.
+2. Default rule: `false`.
+3. Targeting On.
+
+Amelia and Harper get the one-page checkout. Liam gets the three-step classic flow.
+
+**`new-payment-service`** (boolean, guarded-rollout demo)
+
+Separate from the checkout experiment so the two stories do not collide. Targeting On. Default rule: Guarded rollout serving `true`, monitoring **Checkout errors** with automatic rollback.
+
+`./run.sh guarded` evaluates this flag and injects a 15% error rate on the new variation.
+
+**`ai-assistant-enabled`** (boolean kill switch)
+
+Serve `true` when targeting is On. Off variation must be `false`. If LaunchDarkly is unreachable, the SDK default is `false` (fails closed: no AI).
+
+There may also be unused demo flags in the project (`demo-mcp-smoke`, `new-checkout-service`). The page does not read those.
+
+### Metrics
+
+Create these with **randomization unit = user**:
 
 | Metric | Type | Event key | Success |
 |---|---|---|---|
@@ -38,135 +163,182 @@ Create three metrics (Metrics > Create), all with **randomization unit = user**:
 | Checkout revenue | Custom numeric | `checkout-revenue` | Higher is better |
 | Checkout errors | Custom conversion (binary) | `checkout-error` | Lower is better |
 
-### 4. Experiment (is it better?)
-1. On `new-checkout-flow`, create an experiment on the **default rule** (enterprise accounts already have the feature via the rule above, so you're experimenting on everyone else).
-2. Primary metric: **Checkout revenue**. Secondary: **Checkout conversion**. Split 50/50 between `false` and `true`.
-3. Start it, then run the simulator for 20+ minutes:
-   ```bash
-   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=30"
-   ```
-The simulated new flow converts better (32% vs 25%) and has a higher average order, so the experiment should find a real winner.
+`Book Session` on the page tracks conversion and revenue. The traffic simulator tracks all three.
 
-### 5. Guarded rollout (is it safe?)
-Use a **second** flag so it doesn't collide with the experiment. Frame it as a risky backend change.
-1. Create a **boolean** flag `new-payment-service`. Turn targeting On.
-2. On the default rule, from the **Serve** menu, choose **Guarded rollout**. Serve `true`.
-3. Metrics to monitor: **Checkout errors**, with **Automatic rollback** checked. Use the shortest stages the UI allows.
-4. Start it, then run the simulator with the bad release:
-   ```bash
-   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-payment-service --bad --minutes=30"
-   ```
-With `--bad`, the new variation errors at 15% vs 2%. LaunchDarkly should detect the regression and roll back. In the simulator output, watch the NEW share climb with each stage and then drop to 0% after rollback.
+### Experiment (run before the interview)
 
-### 6. AI config (extra credit)
-1. Create a **boolean** flag `ai-assistant-enabled`. Serve `true` when targeting is On, and make sure the **off variation is `false`**. This is the AI kill switch.
-2. Create a config in **completion mode** with key `support-assistant`. (The docs now call these AgentControl configs; the UI may say AI Configs.)
-3. Variation "concise": a small, fast model (e.g. Claude Haiku). System message: `You are a support assistant for {{product}}. Be concise. Address the user as {{ldctx.name}}.`
-4. Variation "detailed": a stronger model (e.g. Claude Sonnet), step-by-step answers, larger max tokens.
-5. Targeting: `plan` is one of `enterprise` serves "detailed"; default serves "concise". Turn targeting on.
+On `new-checkout-flow`, experiment on the **default rule** (enterprise already has the feature via the targeting rule). Primary: Checkout revenue. Secondary: Checkout conversion. 50/50 `false` / `true`. Then:
 
-### 7. Kill switch button on the web page (optional)
-The page's "Turn off AI assistant" button changes the flag through LaunchDarkly's REST API. That needs an **API access token**, which is different from your SDK key. The SDK key can only read flags.
-1. In LaunchDarkly, go to Account settings > Authorization > Access tokens and create a token. Use the narrowest role you can (a custom role that only allows updating this one flag's targeting is ideal).
-2. Put it in `.env` as `LD_API_TOKEN`, along with `LD_PROJECT_KEY` and `LD_ENV_KEY`. The environment key must be the environment your SDK key belongs to.
-3. **Delete the token after the interview.**
+```bash
+./run.sh experiment 30
+```
 
-Without a token the button is disabled and says so. The page still works, and you can flip the flag in the dashboard instead.
+The simulator’s new flow converts better (about 32% vs 25%) and has a higher average order.
 
-## Run with the scripts (easiest)
+### Guarded rollout (start 30–60 minutes before)
 
-1. Copy `.env.example` to `.env` and paste in your keys. The scripts load it automatically.
-2. Run `./run.sh <command>`.
+On `new-payment-service`, guarded rollout serving `true`, metric Checkout errors, automatic rollback, shortest stages the UI allows. Then:
+
+```bash
+./run.sh guarded 30
+```
+
+With `--bad`, new-variation errors are 15% vs 2% on the old variation. Watch NEW share climb, then drop after rollback.
+
+Do not try to create statistically useful experiment or rollout results live.
+
+### Completion config `support-assistant`
+
+AgentControl / AI Config in **completion** mode. Typical variations:
+
+| Variation | Who gets it | Intent |
+|---|---|---|
+| `grounded` | `user.plan` is `enterprise` | Official rates and policies in the system prompt (Sonnet) |
+| `concise` | default | Short, less grounded (Haiku) |
+| `detailed` | optional | Longer answers; a second enterprise rule on `organization.tier` is dead if `plan` and `tier` are always the same |
+
+Turn targeting **On in the same environment as the SDK key** (usually `test`).
+
+### Judge `babysitting-service-reply-accuracy`
+
+Judge-mode config. The Java AI SDK **does not** auto-run judges attached in the UI. After each Ask, `AiAssistant` calls `judgeConfig` and `Judge.evaluate`.
+
+The judge and the grounded assistant need the **same official facts**. If the judge does not know those facts, it scores grounded answers as hallucinations.
+
+The Accuracy card is the **latest Ask only**, not an average. Switching shoppers clears the last answer.
+
+Targeting for the judge must be On in **test**, not only Production.
+
+### Agent config `booking-helper`
+
+Agent mode (tools). Java cannot evaluate this; the Python sidecar does.
+
+| Variation | Tools | Who |
+|---|---|---|
+| `assistant` | find sitters, quote price | default (Liam) |
+| `full-booking-agent` | those plus `create_booking` | enterprise parents (Amelia, Harper) |
+
+Tools are definitions only. The app runs them (`booking/sitters.py`: Maya, Jordan, Sam).
+
+**Find Sitters** is a live Claude turn when `ANTHROPIC_API_KEY` is set. **Confirm Booking** is deterministic: it applies tools locally (Maya next Saturday 18:00, or Jordan) so a new stateless POST does not lose the quote. Each `/api/booking` request is a new turn with no chat history.
+
+The sidecar stays up for the life of `./run.sh web`. It does not book on a timer. The page polls `/api/booking-status` every 2 seconds; Find / Confirm POST `/api/booking`.
+
+## Commands
+
+```bash
+./run.sh <command>
+```
 
 | Command | What it does |
 |---|---|
-| `check` | Verifies Java, Maven, and your keys |
-| `build` | Compiles the project |
-| `web` | Web front end at http://localhost:8080 |
-| `flags` | Feature flag demo |
-| `experiment` | Traffic for the experiment (30 min default) |
-| `guarded` | Bad-release traffic for the guarded rollout |
-| `ai` | AI Config demo with kill switch |
-| `demo` | Interview run: flags, then AI |
+| `check` | Java, Maven, and which keys are set |
+| `build` | `mvn clean compile` |
+| `web` | Sidecar on 8081 + page on 8080 |
+| `flags` | Console multi-context demo |
+| `experiment [min]` | Traffic for `new-checkout-flow` (default 30) |
+| `guarded [min]` | Bad-release traffic for `new-payment-service` |
+| `ai` | Console AI Config + kill switch |
+| `booking [parent]` | One-shot booking helper (`amelia` or `liam`). Add `--confirm` to book |
+| `demo` | `flags` then `ai` |
 
-Change the duration with `./run.sh experiment 45`.
-
-## Run manually
+Equivalent Maven:
 
 ```bash
 export LD_SDK_KEY=sdk-your-key-here
-export ANTHROPIC_API_KEY=sk-ant-your-key     # optional: live AI calls
-
-mvn -q compile exec:java                                                         # flag demo
-mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator     # traffic
-mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo         # AI demo
+mvn -q compile exec:java
+mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=30"
+mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-payment-service --bad --minutes=30"
+mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 ```
 
-Never commit your keys. They come from the environment on purpose.
+## Web page
 
-**First thing to do:** build once and fix any version drift. Both SDK versions in `pom.xml` are properties; set them to the latest on Maven Central.
+The inspector at the top is the talk track: checkout variation, assistant on/off, booking-agent variation, latest accuracy score, and the evaluation reason.
 
-## Web front end
+- **Booking As** switches Amelia / Harper / Liam. The layout, assistant variation, and booking tools change with that context.
+- **Classic booking** (flag off): Address → Payment → Review.
+- **One-page booking** (flag on): all three on one page.
+- The page polls `/api/checkout` every 2 seconds. Flip a flag in the dashboard and the UI swaps without a refresh.
+- **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
+- **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set. Otherwise the button is disabled and you flip the flag in the dashboard.
+- **Find Sitters / Confirm Booking** go through Java to the Python sidecar.
+
+### HTTP API
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/` | Cached `index.html` |
+| GET | `/api/config` | Kill-switch capability, judge key, live model, sidecar present |
+| GET | `/api/checkout` | Flag + assistant state + reason for this shopper |
+| POST | `/api/order` | `checkout-completed` + `checkout-revenue` |
+| POST | `/api/assistant` | Kill switch + completion + judge |
+| GET | `/api/booking-status` | Proxy to sidecar `GET /status` |
+| POST | `/api/booking` | Proxy to sidecar `POST /ask` |
+| POST | `/api/killswitch?state=on\|off` | REST toggle of `ai-assistant-enabled` |
+| GET | `/health`, `/ready` | Liveness / SDK initialized |
+
+POSTs require header `X-LD-Demo: 1` so a random website cannot drive the kill switch from your browser.
+
+## Project layout
+
+```
+pom.xml                          Java SDKs and Maven exec
+run.sh                           Demo runner (loads .env)
+.env.example                     Keys to copy
+src/main/java/com/example/ldemo/
+  CheckoutService.java           Web server and LD client
+  AiAssistant.java               Kill switch, completion, judge
+  FeatureFlagDemo.java           Console targeting demo
+  TrafficSimulator.java          Experiment / guarded traffic
+  AiConfigDemo.java              Console AI demo
+src/main/resources/web/index.html
+src/test/java/com/example/ldemo/ Unit tests and ITs (ITs skip without LD_SDK_KEY)
+booking/
+  booking_helper.py              Agent sidecar and CLI
+  sitters.py                     Tools: find, quote, book
+  test_sitters.py
+  requirements.txt
+```
+
+## Tests
 
 ```bash
-./run.sh web        # then open http://localhost:8080
+mvn -q test
+python3 booking/test_sitters.py
 ```
 
-It uses the same `new-checkout-flow` flag and the same three shoppers as `FeatureFlagDemo`, so your existing targeting rule works with no changes.
-
-- **Shopping as** switches between Amelia and Harper (Amelia's Babysitting Service, enterprise) and Liam (Parkside Parents Co-op, free).
-- **The inspector** at the top shows the deployed version, the flag state, which checkout this shopper sees, the context sent to LaunchDarkly, and why the flag resolved that way. "Show API response" reveals the raw JSON.
-- **Legacy checkout** is a three-step flow (shipping, payment, review). **New checkout** puts everything on one page.
-- **Live flips.** The page checks the server every 2 seconds. Change the flag in the dashboard and the layout swaps with a banner, with no refresh and no redeploy. Turn it off and it rolls back the same way.
-- **Place order** sends `checkout-completed` and `checkout-revenue` to LaunchDarkly, so real clicks feed your experiment and guarded rollout.
-- **AI assistant.** "Ask about your order" answers questions using the model and prompt LaunchDarkly serves to that shopper. Amelia (enterprise) and Liam (free) get different models. The reply shows the model, the tokens, and the latency.
-- **Kill switch.** "Turn off AI assistant" sets `ai-assistant-enabled` off through the REST API. Within about 2 seconds the assistant disappears for every shopper, a banner announces it, and shoppers see a fallback message. "Turn AI assistant back on" reverses it. The inspector shows the flag's state too.
-- **The SDK key never reaches the browser.** The Java server evaluates flags and returns only the results. That's a good security point for an enterprise buyer.
-- The port defaults to 8080. Set `PORT` in `.env` to change it.
-- The server only accepts connections from your own machine (`127.0.0.1`). Set `HOST` if you ever need otherwise.
-
-**Quick demo flow:** open the page as Liam (legacy checkout), switch to Amelia (new checkout), then change the targeting rule in the dashboard and watch Amelia's page flip live. Ask the assistant a question, then click **Turn off AI assistant** and watch it disappear live. Turn it back on to reset for the next run.
-
-**Notes**
-- The page sends the shopper's plan and role to the server so targeting works in a demo. A real service would look those up server-side instead of trusting the browser.
-- The fonts load from Google Fonts. If you're offline, the page falls back to your system fonts and still works.
-- Card details on the page are fixed demo data. No real payment information is collected.
-- The assistant gives a **simulated reply** unless `ANTHROPIC_API_KEY` is set. The page labels simulated replies, and you should say so too.
-- Every POST from the page carries a custom header that the server requires. That stops other websites from making your browser call this local app, which matters because the kill switch button can change a real flag.
-
-## IMPORTANT: run the experiment and guarded rollout BEFORE the interview
-
-Both need real traffic and time. Experiments need enough samples to reach a result, and guarded rollouts step through stages and need a minimum number of contexts per stage. Don't try to do them live.
-
-- Run the experiment the day before, so results are ready to show.
-- Start the guarded rollout 30-60 minutes before the interview, so you can show either the rollback that already happened or one in progress.
-- Screenshot both as a backup in case the UI is slow during the call.
+JUnit covers context shape, checkout query parsing, kill-switch / booking HTML markers, judge JSON, and sidecar proxying. `*IT.java` talks to a live SDK and skips if `LD_SDK_KEY` is unset. The sidecar bind test needs a real local socket (not a restricted sandbox).
 
 ## Demo script (about 12 minutes)
 
-1. **Frame it (30 sec).** "Deploying code and releasing a feature are different things. LaunchDarkly separates them, so shipping is low-risk and reversible."
-2. **Account-level targeting.** Run `FeatureFlagDemo`. Amelia and Harper both get the new flow because Amelia's Babysitting Service is an enterprise account, not because of who they are individually. "Enterprise customers want their whole org to change at once, not random users inside it." Point at the **reason** column: it names the rule that matched.
-3. **Live change and kill switch.** Toggle the flag while the app runs. The listener prints the change immediately, with no restart and no redeploy.
-4. **Experiment.** Switch to the experiment results. "We didn't guess the new flow was better. We measured revenue and conversion per variation, and here's the result."
-5. **Guarded rollout.** Show `new-payment-service`. "This one's a riskier backend change, so it rolled out in stages while LaunchDarkly watched the error rate. When errors regressed, it rolled itself back. Nobody got paged at 2am."
-6. **Web page.** Run `./run.sh web` and open the page. Switch between Amelia and Liam. Change the flag in the dashboard and watch the layout flip live.
-7. **AI configs.** Ask the assistant a question as Amelia, then as Liam. Different models and prompts from the same code, with token counts and latency. (The console version is `./run.sh ai`.)
-8. **AI kill switch (closing line).** Click **Turn off AI assistant**. Within seconds it's gone for every shopper, with no redeploy. "If the model starts giving bad answers, one click turns it off everywhere. That's how you ship AI fast without betting the business on it."
+1. **Frame it.** Deploying code and releasing a feature are different. LaunchDarkly separates them so shipping is reversible.
+2. **Account-level targeting.** Amelia and Harper share `org-ld` / enterprise, so both get the new checkout. Liam’s co-op does not. Point at the reason in the inspector.
+3. **Live change.** Flip `new-checkout-flow` in the dashboard. The layout swaps in about 2 seconds. No restart.
+4. **Experiment.** Show pre-run results on revenue and conversion. Say the traffic is simulated; the mechanics are real.
+5. **Guarded rollout.** Show `new-payment-service` rollback on `checkout-error`.
+6. **AI configs.** Ask as Amelia (grounded, high Accuracy) then Liam (concise, often 0%). Same code, different variation.
+7. **Judge.** The Accuracy card is a second model scoring the first against official facts. Latest Ask only.
+8. **Booking agent.** Amelia can Find Sitters and Confirm Booking. Liam can quote but Confirm stays locked. LaunchDarkly chose the tools.
+9. **Kill switch.** Turn Off AI Assistant. The panel becomes a fallback for every shopper. One switch, no redeploy.
 
-## Talk track: tie it to your background
+## Talk track extras
 
-- Harness is deployment automation, LaunchDarkly is release control. The pipeline ships the code, flags decide who sees it.
-- Canary at the deploy layer, guarded rollout at the feature layer. Two safety nets, each with automatic rollback.
-- Faster AI-generated code means more change hitting production, which makes guarded, reversible release more valuable.
-- Stakeholder angles: CTO (risk and control), CFO (experiments prove ROI before full rollout), compliance (audit log, approvals), engineers (no release-night stress).
+- Harness (or any CI) ships the binary. LaunchDarkly decides who sees the feature.
+- Canary at deploy time, guarded rollout at feature time.
+- Faster AI-generated code means more change in production, which makes reversible release more valuable.
+- The SDK key stays on the server. That is the enterprise security line.
 
-## Caveats to know before you present
+## Caveats
 
-- **Guarded rollouts** are an Enterprise + Guardian add-on feature. Your trial includes a limited number, so don't burn them on test runs you don't need.
-- **Simulated traffic.** Say plainly that the experiment and rollout data comes from a traffic generator. The mechanics are real, the shoppers aren't.
-- **Context usage.** Each simulated user counts as a context in your account. The default pool is 3,000. Lower `--users` if your trial has a tight limit.
-- **The Java AI SDK is pre-1.0.** If it misbehaves live, say so and show the config in the UI instead. The model name and messages are read by reflection, so a renamed getter won't break the build.
-- **The kill switch button uses an API token that can change flags.** Keep it in `.env`, never commit it, give it the narrowest role you can, and delete it after the interview.
-- **Judges and online evaluations.** The Java AI SDK doesn't run judges automatically. Don't claim otherwise.
-- **AI model names** in the AI Config are sent to Anthropic as-is. Test them before the interview.
-- **Fails closed.** Flags default to `false`, so if LaunchDarkly is unreachable, new features and the AI assistant turn off rather than running unchecked.
+- **Guarded rollouts** are an Enterprise + Guardian add-on. Trials include a limited number.
+- **Simulated traffic and shoppers.** Say so.
+- Each simulated user is a context against your MAU. Default pool is 3,000. Lower `--users` if the trial is tight.
+- The **Java AI SDK is pre-1.0**. Model name and messages are read by reflection so a renamed getter does not break the build.
+- **Judges do not auto-run** from the UI attachment. The app calls `judgeConfig`.
+- **AI model names** in the config go to Anthropic as-is. Try them before the interview.
+- **Fails closed.** Flags default `false`. If LaunchDarkly is down, new checkout and the assistant stay off.
+- **Kill-switch token** can change a real flag. Keep it in `.env`, never commit it, delete it after the demo.
+- Card numbers on the page are fake. No real payments.
+- Shopper `plan` / `tier` are sent from the browser for the demo. A real service would look those up server-side.
+)

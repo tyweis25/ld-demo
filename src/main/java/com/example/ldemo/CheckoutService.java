@@ -3,6 +3,7 @@ package com.example.ldemo;
 import com.launchdarkly.sdk.EvaluationDetail;
 import com.launchdarkly.sdk.LDContext;
 import com.launchdarkly.sdk.LDValue;
+import com.launchdarkly.sdk.ObjectBuilder;
 import com.launchdarkly.sdk.server.LDClient;
 import com.launchdarkly.sdk.server.ai.LDAIClient;
 import com.launchdarkly.sdk.server.ai.LDAIClientImpl;
@@ -16,6 +17,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -33,6 +35,8 @@ import java.util.concurrent.Executors;
  *   GET  /api/checkout     which checkout flow, and is the AI assistant on, for this shopper?
  *   POST /api/order        place an order, sending events to LaunchDarkly
  *   POST /api/assistant    ask the AI assistant (kill switch + AI Config + model call)
+ *   GET  /api/booking-status  which booking-helper variation this shopper gets (Python sidecar)
+ *   POST /api/booking      ask the booking agent (Python sidecar evaluates the agent config)
  *   POST /api/killswitch   turn the AI assistant flag off or on through the LaunchDarkly REST API
  *   GET  /health, /ready   liveness and readiness
  *
@@ -73,6 +77,7 @@ public class CheckoutService {
         String envKey = env("LD_ENV_KEY");
         String apiBase = System.getenv().getOrDefault("LD_API_BASE", "https://app.launchdarkly.com");
         boolean canToggle = !apiToken.isEmpty() && projectKey.matches("[A-Za-z0-9._-]+") && !envKey.isEmpty();
+        String bookingHelperUrl = env("BOOKING_HELPER_URL");
 
         byte[] page = loadPage();
 
@@ -104,7 +109,9 @@ public class CheckoutService {
         server.createContext("/api/config", ex -> send(ex, 200, JSON, LDValue.buildObject()
                 .put("can_toggle", canToggle)
                 .put("assistant_flag", AiAssistant.KILL_SWITCH_FLAG)
+                .put("judge_key", AiAssistant.JUDGE_KEY)
                 .put("live_model", !anthropicKey.isEmpty())
+                .put("booking_helper", !bookingHelperUrl.isEmpty())
                 .build().toJsonString()));
 
         server.createContext("/api/checkout", ex -> {
@@ -157,16 +164,35 @@ public class CheckoutService {
                     send(ex, 200, JSON, LDValue.buildObject().put("available", true).put("ok", false)
                             .put("model", a.model).put("error", String.valueOf(a.error)).build().toJsonString());
                 } else {
-                    send(ex, 200, JSON, LDValue.buildObject().put("available", true).put("ok", true)
+                    ObjectBuilder reply = LDValue.buildObject().put("available", true).put("ok", true)
                             .put("model", a.model).put("reply", a.text)
                             .put("input_tokens", a.inputTokens).put("output_tokens", a.outputTokens)
-                            .put("latency_ms", a.latencyMs).put("live", a.live)
-                            .build().toJsonString());
+                            .put("latency_ms", a.latencyMs).put("live", a.live);
+                    if (a.variation != null) reply.put("variation", a.variation);
+                    if (a.judgeKey != null) reply.put("judge_key", a.judgeKey).put("judge_live", a.judgeLive);
+                    if (a.judgeScore != null) reply.put("judge_score", a.judgeScore);
+                    if (a.judgeReasoning != null) reply.put("judge_reasoning", a.judgeReasoning);
+                    if (a.judgeError != null) reply.put("judge_error", a.judgeError);
+                    send(ex, 200, JSON, reply.build().toJsonString());
                 }
             } catch (RuntimeException e) {
                 send(ex, 200, JSON, LDValue.buildObject().put("available", true).put("ok", false)
                         .put("error", "The assistant hit an error: " + e.getMessage()).build().toJsonString());
             }
+        });
+
+        server.createContext("/api/booking-status", ex -> {
+            if (!ex.getRequestMethod().equals("GET")) { send(ex, 405, JSON, "{\"error\":\"use GET\"}"); return; }
+            send(ex, 200, JSON, callBookingHelper(bookingHelperUrl, "GET", "/status?" + bookingQuery(query(ex.getRequestURI().getRawQuery()), false)));
+        });
+
+        server.createContext("/api/booking", ex -> {
+            if (!requirePost(ex)) return;
+            Map<String, String> q = query(ex.getRequestURI().getRawQuery());
+            String question = q.getOrDefault("question", "").trim();
+            if (question.isEmpty()) { send(ex, 400, JSON, "{\"ok\":false,\"error\":\"Type a request first.\"}"); return; }
+            if (question.length() > 500) q.put("question", question.substring(0, 500));
+            send(ex, 200, JSON, callBookingHelper(bookingHelperUrl, "POST", "/ask?" + bookingQuery(q, true)));
         });
 
         server.createContext("/api/killswitch", ex -> {
@@ -195,6 +221,7 @@ public class CheckoutService {
         System.out.printf("Amelia's Babysitting Service %s is running at http://localhost:%d (flag: %s)%n", version, port, flagKey);
         System.out.println("AI assistant model calls: " + (anthropicKey.isEmpty() ? "SIMULATED" : "LIVE (Anthropic)"));
         System.out.println("Kill switch button: " + (canToggle ? "enabled" : "disabled (no LD_API_TOKEN / LD_PROJECT_KEY / LD_ENV_KEY)"));
+        System.out.println("Booking agent sidecar: " + (bookingHelperUrl.isEmpty() ? "not configured" : bookingHelperUrl));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -274,6 +301,44 @@ public class CheckoutService {
         return enabled ? "new one-page booking" : "classic multi-step booking";
     }
 
+    static String bookingQuery(Map<String, String> q, boolean includeQuestion) {
+        String user = q.getOrDefault("user", "anonymous");
+        String name = q.getOrDefault("name", user);
+        String plan = q.getOrDefault("plan", q.getOrDefault("tier", "free"));
+        StringBuilder out = new StringBuilder();
+        out.append("user=").append(enc(user))
+                .append("&name=").append(enc(name))
+                .append("&plan=").append(enc(plan));
+        if (includeQuestion) {
+            out.append("&question=").append(enc(q.getOrDefault("question", "")))
+                    .append("&confirm=").append(enc(q.getOrDefault("confirm", "false")));
+        }
+        return out.toString();
+    }
+
+    static String callBookingHelper(String base, String method, String pathAndQuery) {
+        if (base == null || base.isBlank()) {
+            return "{\"ok\":false,\"error\":\"The booking agent sidecar is not running. Start the page with ./run.sh web.\"}";
+        }
+        try {
+            HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(base + pathAndQuery))
+                    .timeout(Duration.ofSeconds(45));
+            if ("POST".equals(method)) {
+                req.POST(HttpRequest.BodyPublishers.noBody());
+            } else {
+                req.GET();
+            }
+            HttpResponse<String> response = HTTP.send(req.build(), HttpResponse.BodyHandlers.ofString());
+            String body = response.body();
+            return (body == null || body.isBlank()) ? "{\"ok\":false,\"error\":\"Empty response from the booking agent.\"}" : body;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "{\"ok\":false,\"error\":\"The booking agent request was interrupted.\"}";
+        } catch (IOException | RuntimeException e) {
+            return "{\"ok\":false,\"error\":\"Couldn't reach the booking agent sidecar. Start the page with ./run.sh web.\"}";
+        }
+    }
+
     static double parseAmount(String raw) {
         try {
             double v = Double.parseDouble(raw);
@@ -288,14 +353,18 @@ public class CheckoutService {
         return v == null ? "" : v.trim();
     }
 
-    private static byte[] loadPage() throws IOException {
+    static byte[] loadPage() throws IOException {
         try (InputStream in = CheckoutService.class.getResourceAsStream("/web/index.html")) {
             if (in == null) throw new IOException("web/index.html not found on the classpath");
             return in.readAllBytes();
         }
     }
 
-    private static Map<String, String> query(String raw) {
+    private static String enc(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
+    static Map<String, String> query(String raw) {
         Map<String, String> out = new HashMap<>();
         if (raw == null || raw.isEmpty()) return out;
         for (String pair : raw.split("&")) {
