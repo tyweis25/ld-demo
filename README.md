@@ -8,14 +8,20 @@ The browser never talks to LaunchDarkly and never sees the SDK key. A local Java
 
 ## Lab requirements
 
+Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of the top 5). Python is used only for AgentControl **agent** mode, which the Java AI SDK cannot run.
+
 | Requirement | Where it is implemented | How to run it |
 |---|---|---|
-| **Part 1 — Release** | Boolean flag `new-checkout-flow` switches classic vs one-page booking in `CheckoutService` and `index.html` | `./run.sh web`, then Book A Sitter |
-| **Part 1 — Remediate** | Kill switch `ai-assistant-enabled` (REST toggle from the page). Guarded rollout on `new-payment-service` with metric `checkout-error` | Turn Off AI Assistant on the page, or `./run.sh guarded` |
-| **Part 2 — Target** | Multi-context `user` + `organization`. Enterprise orgs (`org-ld`) get the new checkout; Liam’s free co-op does not | `./run.sh web` and switch Amelia / Harper / Liam, or `./run.sh flags` |
-| **Extra credit — Experiment** | Metrics `checkout-completed` and `checkout-revenue`; `TrafficSimulator` on `new-checkout-flow` | `./run.sh experiment` then the experiment in LaunchDarkly |
-| **Extra credit — AI Configs** | Completion config `support-assistant`, judge `babysitting-service-reply-accuracy`, agent config `booking-helper` (Python sidecar) | Ask and Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
-| **Extra credit — Integrations** | LaunchDarkly hosted MCP (`.cursor/mcp.json`) and agent skills under `.agents/skills` | Open the project in Cursor with the LaunchDarkly MCP connected |
+| **Part 1 — Feature flag** | Boolean `new-checkout-flow` wraps the booking form: classic three-step vs one-page (`CheckoutService`, `index.html`). Recreate this flag in your project if it does not exist. | `./run.sh web` → Book A Sitter. Toggle the flag in LaunchDarkly. |
+| **Part 1 — Instant release / rollback** | The Java SDK streams flag changes (`addFlagChangeListener`). The page polls `/api/checkout` every 2 seconds and swaps the form **without a reload**. | Flip `new-checkout-flow` in the dashboard while the page is open. |
+| **Part 1 — Remediate** | Kill switch `ai-assistant-enabled`. The **Turn Off AI Assistant** button (or curl) PATCHes the flag off through the REST API. | Button on the page, or `curl -X POST -H 'X-LD-Demo: 1' 'http://127.0.0.1:8080/api/killswitch?state=off'` |
+| **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
+| **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
+| **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH`. | Select Harper. |
+| **Part 2 — Rule-based targeting** | Rule: **organization** `tier` is one of `enterprise` → `true`. Inspector reason: `RULE_MATCH`. | Select Amelia. Liam (`free`) gets the default (`false`). |
+| **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
+| **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
+| **Extra credit — Integrations** | LaunchDarkly hosted MCP (`.cursor/mcp.json`) and agent skills under `.agents/skills` (used with Cursor). | Open the project in Cursor with the LaunchDarkly MCP connected. |
 
 The web app is the main surface: `./run.sh web` then open [http://localhost:8080](http://localhost:8080).
 
@@ -129,21 +135,24 @@ Every evaluation is a **user + organization** multi-context. Account-level rules
 | Harper Reed | `user-harper` | parent | same org as Amelia | enterprise |
 | Liam Carter | `user-liam` | parent | `org-bright` Parkside Parents Co-op | free |
 
-Harper shows that checkout targeting is **account**-level: she is not an admin, but she still gets the enterprise flow.
+Part 2 uses the same three shoppers to show both targeting styles: Amelia matches the **rule** (`RULE_MATCH`), Harper is an **individual target** (`TARGET_MATCH`), Liam hits the default rule (`FALLTHROUGH`). The inspector prints that reason.
 
 ## LaunchDarkly objects the code expects
+
+Recreate these in your trial project if they are not already there. The code keys are listed below; names in the UI can differ.
 
 ### Feature flags
 
 **`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
 
-1. Rule: context kind **organization**, attribute `tier`, is one of `enterprise` → `true`.
-2. Default rule: `false`.
-3. Targeting On.
+1. **Individual targeting:** add user `user-harper` to serve `true`.
+2. **Rule-based targeting:** context kind **organization**, attribute `tier`, is one of `enterprise` → `true`.
+3. Default rule: `false`.
+4. Targeting On.
 
-Amelia and Harper get the one-page checkout. Liam gets the three-step classic flow.
+Amelia (enterprise, not individually listed) gets the one-page checkout via the rule. Harper gets it because she is named. Liam (`org-bright` / free) gets classic.
 
-**`new-payment-service`** (boolean, guarded-rollout demo)
+**`new-payment-service`** (boolean, optional guarded-rollout beyond the lab)
 
 Separate from the checkout experiment so the two stories do not collide. Targeting On. Default rule: guarded rollout serving `true`, monitoring **Checkout errors** with automatic rollback.
 

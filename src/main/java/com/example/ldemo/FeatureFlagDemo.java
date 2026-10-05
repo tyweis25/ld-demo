@@ -15,7 +15,8 @@ import java.util.Scanner;
  * Uses MULTI-CONTEXTS (user + organization) so targeting can happen at the account level:
  * everyone at an enterprise customer gets the new flow together, regardless of their own role.
  *
- * Flag to create in the LaunchDarkly UI (boolean): new-checkout-flow
+ * Recreate this boolean flag in your LaunchDarkly project: new-checkout-flow
+ * Part 2: individual-target user-harper; rule-target organization.tier = enterprise.
  * Run: export LD_SDK_KEY=sdk-xxxx && mvn -q compile exec:java
  */
 public class FeatureFlagDemo {

@@ -44,12 +44,13 @@ import java.util.concurrent.Executors;
  * with the server-side SDK and returns only the results.
  *
  * Config (environment variables):
- *   LD_SDK_KEY                required
+ *   LD_SDK_KEY                required; replace with your server-side SDK key in .env
+ *   FLAG_KEY                  optional; recreate boolean flag new-checkout-flow in your project
  *   ANTHROPIC_API_KEY         optional, makes the assistant call a real model
  *   LD_API_TOKEN, LD_PROJECT_KEY, LD_ENV_KEY
  *                             optional, together they enable the kill switch button
  *   LD_API_BASE               optional, defaults to https://app.launchdarkly.com (EU: https://app.eu.launchdarkly.com)
- *   FLAG_KEY, APP_VERSION, PORT, HOST (HOST defaults to 127.0.0.1 so only this machine can reach it)
+ *   APP_VERSION, PORT, HOST   HOST defaults to 127.0.0.1 so only this machine can reach it
  *
  * Run: ./run.sh web   then open http://localhost:8080
  */
