@@ -48,6 +48,14 @@ final class AiAssistant {
     static final String JUDGE_KEY = "babysitting-service-reply-accuracy";
     /** Create this boolean kill-switch flag in LaunchDarkly. */
     static final String KILL_SWITCH_FLAG = "ai-assistant-enabled";
+    /** Custom conversion: successful Ask reply (secondary experiment metric). */
+    static final String EVENT_ASSISTANT_REPLY = "assistant-reply";
+    /** Custom conversion: reply judged helpful (primary experiment metric). */
+    static final String EVENT_ASSISTANT_HELPFUL = "assistant-helpful";
+    /** Custom numeric: Ask latency in ms (secondary experiment metric). */
+    static final String EVENT_ASSISTANT_LATENCY_MS = "assistant-latency-ms";
+    /** Judge / demo threshold for "helpful" when a live score is present. */
+    static final double HELPFUL_SCORE_THRESHOLD = 0.6;
     private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
@@ -116,6 +124,7 @@ final class AiAssistant {
         boolean live = anthropicKey != null && !anthropicKey.isBlank();
 
         // 3. Call the model, timing it and recording tokens against this config variation.
+        //    Custom track() events below feed the support-assistant experiment metrics in LaunchDarkly.
         LDAIConfigTracker tracker = config.createTracker();
         try {
             long start = System.nanoTime();
@@ -124,12 +133,56 @@ final class AiAssistant {
             tracker.trackTokens(new LDAITrackingTypes.TokenUsage(
                     r.inputTokens + r.outputTokens, r.inputTokens, r.outputTokens));
             tracker.trackSuccess();
-            return score(aiClient, ctx, question, Answer.ok(model, variation, r.text, r.inputTokens, r.outputTokens, ms, live), anthropicKey);
+            Answer answer = score(aiClient, ctx, question,
+                    Answer.ok(model, variation, r.text, r.inputTokens, r.outputTokens, ms, live), anthropicKey);
+            trackExperimentMetrics(ldClient, ctx, tracker, answer);
+            return answer;
         } catch (Exception e) {
             tracker.trackError();
             String why = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return Answer.failed(model, why);
         }
+    }
+
+    /**
+     * Emit custom metrics for the support-assistant experiment, plus AI SDK feedback for autogen metrics.
+     * Event keys: assistant-reply, assistant-helpful, assistant-latency-ms.
+     */
+    static void trackExperimentMetrics(LDClient ldClient, LDContext ctx, LDAIConfigTracker tracker, Answer answer) {
+        if (ldClient == null || ctx == null || answer == null || !answer.available || answer.error != null) {
+            return;
+        }
+        ldClient.track(EVENT_ASSISTANT_REPLY, ctx);
+        ldClient.trackMetric(EVENT_ASSISTANT_LATENCY_MS, ctx, LDValue.ofNull(), answer.latencyMs);
+
+        boolean helpful = isHelpful(answer);
+        if (helpful) {
+            ldClient.track(EVENT_ASSISTANT_HELPFUL, ctx);
+        }
+        if (tracker != null) {
+            tracker.trackFeedback(helpful
+                    ? LDAITrackingTypes.FeedbackKind.POSITIVE
+                    : LDAITrackingTypes.FeedbackKind.NEGATIVE);
+        }
+    }
+
+    /**
+     * Live answers use the accuracy judge score. Simulated answers (no Anthropic key) differentiate
+     * experiment arms by variation key so Haiku/concise vs Sonnet/detailed still move the primary metric.
+     */
+    static boolean isHelpful(Answer answer) {
+        if (answer == null) return false;
+        if (answer.live && answer.judgeScore != null) {
+            return answer.judgeScore >= HELPFUL_SCORE_THRESHOLD;
+        }
+        String variation = answer.variation == null ? "" : answer.variation.toLowerCase();
+        // concise (Haiku) is the control; detailed publishes under variation key "support-assistant".
+        if (variation.contains("concise") || variation.contains("haiku")) return false;
+        if (variation.contains("grounded") || variation.contains("detailed")
+                || "support-assistant".equals(variation)) {
+            return true;
+        }
+        return answer.judgeScore != null && answer.judgeScore >= HELPFUL_SCORE_THRESHOLD;
     }
 
     // ------------------------------------------------------------------------------------------

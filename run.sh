@@ -68,6 +68,12 @@ case "${1:-help}" in
     fi
     ;;
   ai)          need_key; run AiConfigDemo ;;
+  ai-experiment)
+    # Free-tier Ask traffic for the support-assistant prompt/model experiment (fallthrough).
+    # Usage: ./run.sh ai-experiment [users] [asks-per-user]
+    need_key
+    run AiExperimentTraffic "${2:-120} ${3:-1}"
+    ;;
   booking)
     need_key
     py="$(command -v python3)"
@@ -91,6 +97,7 @@ Usage: ./run.sh <command>
   guarded [min]      Bad-release traffic for the guarded rollout on new-payment-service
   remediate          POST LD_FLAG_TRIGGER_URL to turn off new-booking-ui (classic chrome)
   ai                 AI Config demo with kill switch
+  ai-experiment [n] [asks]  Free-tier traffic for support-assistant experiment (default 120×1)
   booking [parent]   Agent booking helper (amelia or liam). Add --confirm to book.
   demo               Interview run: flags, then AI
 USAGE

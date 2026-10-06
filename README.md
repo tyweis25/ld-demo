@@ -22,6 +22,7 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 | **Part 2 — Rule-based targeting** | On `new-checkout-flow`: org `tier` enterprise → one-page; free → multi-step. Skin is separate (`new-booking-ui`). | Amelia = one-page; Liam = multi-step (both can be Harbor Dusk). |
 | **Extra credit — Experimentation** | Same flag. Metrics `checkout-completed` / `checkout-revenue`. Experiment on the default rule. `TrafficSimulator` generates traffic. | `./run.sh experiment` then open the experiment in LaunchDarkly. |
 | **Extra credit — AI Configs** | Completion config `support-assistant` (prompts and models by `user.plan`). Optional judge `babysitting-service-reply-accuracy`. Agent config `booking-helper` (Python sidecar). | Ask / Book A Sitter on the page, or `./run.sh ai` / `./run.sh booking` |
+| **Extra credit — AI Config experiment** | Experiment **Support Assistant Prompt/Model A/B** (`support-assistant-prompt-model`) on the AI Config default rule: concise Haiku vs detailed Sonnet. Metrics `assistant-helpful` (primary), `assistant-reply`, `assistant-latency-ms`. `AiAssistant` tracks on every Ask. | `./run.sh ai-experiment` (free-tier traffic) or Ask as Liam on the page |
 | **Extra credit — Integrations** | (1) LaunchDarkly hosted MCP + agent skills (`.cursor/mcp.json`, `.agents/skills`) for Cursor. (2) Flag trigger remediate (`LD_FLAG_TRIGGER_URL` + `./run.sh remediate`). | Connect MCP in Cursor; run `./run.sh remediate` after setting the trigger URL. |
 
 The web app is the main surface: `./run.sh web` then open [http://localhost:8080](http://localhost:8080).
@@ -184,8 +185,11 @@ Create these with **randomization unit = user**:
 | Checkout conversion | Custom conversion (binary) | `checkout-completed` | Higher is better |
 | Checkout revenue | Custom numeric | `checkout-revenue` | Higher is better |
 | Checkout errors | Custom conversion (binary) | `checkout-error` | Lower is better |
+| Assistant helpful | Custom conversion (binary) | `assistant-helpful` | Higher is better |
+| Assistant reply | Custom conversion (binary) | `assistant-reply` | Higher is better |
+| Assistant latency (ms) | Custom numeric | `assistant-latency-ms` | Lower is better |
 
-`Book Session` on the page tracks conversion and revenue. The traffic simulator tracks all three.
+`Book Session` on the page tracks conversion and revenue. The traffic simulator tracks all three checkout metrics. Every successful Ask tracks the three assistant metrics (plus AI SDK tokens / duration / feedback for Monitoring).
 
 ### Experiment
 
@@ -214,10 +218,29 @@ AgentControl / AI Config in **completion** mode. Typical variations:
 | Variation | Who gets it | Intent |
 |---|---|---|
 | `grounded` | `user.plan` is `enterprise` | Official rates and policies in the system prompt (Sonnet) |
-| `concise` | default | Short, less grounded (Haiku) |
-| `detailed` | optional | Longer answers |
+| `concise` | fallthrough experiment (50%, control) | Short, less grounded (Haiku) |
+| `detailed` | fallthrough experiment (50%) | Longer answers (Sonnet) |
 
 Turn targeting **On in the same environment as the SDK key** (usually `test`).
+
+### AI Config experiment (`support-assistant-prompt-model`)
+
+Experiment **Support Assistant Prompt/Model A/B** on the AI Config **default rule** (fallthrough): 50/50 **concise Haiku** (control) vs **detailed Sonnet**. Enterprise `plan` still matches the grounded rule and is outside the experiment.
+
+| Metric | Role | Event key |
+|---|---|---|
+| Assistant helpful | Primary | `assistant-helpful` |
+| Assistant reply | Secondary | `assistant-reply` |
+| Assistant latency (ms) | Secondary | `assistant-latency-ms` |
+
+`AiAssistant.ask` tracks these after every successful reply (web Ask, `./run.sh ai`, `./run.sh ai-experiment`). Live answers use the accuracy judge (≥ 0.6 = helpful); simulated answers treat detailed/grounded as helpful and concise as not, so the arms still separate without Anthropic.
+
+```bash
+./run.sh ai-experiment        # 120 free-tier users × 1 Ask (simulated unless ANTHROPIC_API_KEY is set)
+./run.sh ai-experiment 60 2   # 60 users × 2 Asks
+```
+
+Results: LaunchDarkly → Experiments → **Support Assistant Prompt/Model A/B** (env `test`), or the `support-assistant` Monitoring tab for tokens / duration / feedback.
 
 ### Judge `babysitting-service-reply-accuracy`
 
@@ -260,6 +283,7 @@ The sidecar stays up for the life of `./run.sh web`. It does not book on a timer
 | `guarded [min]` | Bad-release traffic for `new-payment-service` |
 | `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-booking-ui` (classic chrome) |
 | `ai` | Console AI Config + kill switch |
+| `ai-experiment [n] [asks]` | Free-tier Ask traffic for `support-assistant` experiment (default 120×1) |
 | `booking [parent]` | One-shot booking helper (`amelia` or `liam`). Add `--confirm` to book |
 | `demo` | `flags` then `ai` |
 
@@ -315,10 +339,11 @@ run.sh                           Demo runner (loads .env)
 .cursor/mcp.json                 LaunchDarkly hosted MCP
 src/main/java/com/example/ldemo/
   CheckoutService.java           Web server and LD client
-  AiAssistant.java               Kill switch, completion, judge
+  AiAssistant.java               Kill switch, completion, judge, experiment metrics
   FeatureFlagDemo.java           Console targeting demo
   TrafficSimulator.java          Experiment / guarded traffic
   AiConfigDemo.java              Console AI demo
+  AiExperimentTraffic.java       Free-tier Ask burst for AI Config experiment
 src/main/resources/web/index.html
 src/test/java/com/example/ldemo/ Unit tests and ITs (ITs skip without LD_SDK_KEY)
 booking/
