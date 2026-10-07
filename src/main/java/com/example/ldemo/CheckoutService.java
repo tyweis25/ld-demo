@@ -60,9 +60,10 @@ import java.util.concurrent.TimeUnit;
  *   LD_API_BASE               optional, defaults to https://app.launchdarkly.com (EU: https://app.eu.launchdarkly.com)
  *   APP_VERSION, PORT, HOST   HOST defaults to 127.0.0.1 so only this machine can reach it
  *
- * Flags / configs this app expects you to create in LaunchDarkly:
+ * Flags / configs this app expects you to create in LaunchDarkly (see README):
  *   new-booking-ui          — Harbor Dusk skin (true) vs classic Amelia chrome (false); remediable
  *   new-checkout-flow       — booking form flow (one-page vs multi-step); Part 2 targeting
+ *   new-checkout-service    — optional; Guardian + ./run.sh guarded only (not this page)
  *   ai-assistant-enabled    — kill switch for the support assistant
  *   support-assistant       — AI Config (completion) for Ask
  *   babysitting-service-reply-accuracy — accuracy judge (optional)

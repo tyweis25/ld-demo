@@ -144,9 +144,43 @@ Part 2 uses the same three shoppers to show both targeting styles: Amelia matche
 
 ## LaunchDarkly objects the code expects
 
-Recreate these in your trial project if they are not already there. The code keys are listed below; names in the UI can differ.
+Create these in **project `default`, environment `test`**. Leave Production Off unless you are intentionally promoting. The **keys** below must match the code; display names can differ.
+
+A missing flag or config does not crash the app. The SDK default is `false` / disabled, so checkout stays multi-step, Harbor Dusk stays off, and AI stays off.
+
+**Minimum (booking page + Part 1 / Part 2)**
+
+1. Context kind **`organization`** with attribute `tier` (string). Built-in **`user`** needs attribute `plan` (string). Shoppers send both; see the table above.
+2. Boolean flags **`new-booking-ui`** and **`new-checkout-flow`** (targeting below).
+3. Optional: generic **turn off** trigger on `new-booking-ui` → `LD_FLAG_TRIGGER_URL` for remediate.
+
+**Experiments / Guardian (optional)**
+
+4. Metrics in the table below (randomization unit **user**).
+5. Experiment on `new-checkout-flow` default rule.
+6. Boolean **`new-checkout-service`** + Guardian on Checkout errors (`./run.sh guarded`).
+
+**AI (optional; simulated replies work without `ANTHROPIC_API_KEY`)**
+
+7. Boolean **`ai-assistant-enabled`**.
+8. Completion config **`support-assistant`** (three variations + targeting).
+9. Judge config **`babysitting-service-reply-accuracy`** (same official facts as grounded).
+10. Library tools `find_available_sitters`, `quote_price`, `create_booking`, then agent config **`booking-helper`**.
+11. Experiment **Support Assistant Prompt/Model A/B** (`support-assistant-prompt-model`) on the AI Config default rule.
+
+New AI configs fall through to an auto-generated **disabled** variation until you turn targeting **On** and point fallthrough at a real variation. Until then the SDK returns `enabled=false`.
 
 ### Feature flags
+
+**`new-booking-ui`** (boolean, Harbor Dusk chrome)
+
+Used by the page only. Independent of checkout flow.
+
+1. Variations: `true` (Harbor Dusk), `false` (classic Amelia lavender).
+2. Off variation: `false`.
+3. Default / fallthrough: `true` (everyone gets Harbor Dusk when targeting is On).
+4. Targeting **On** in Test to demo the skin; **Off** shows classic chrome. No individual targets or rules required.
+5. Optional remediate trigger (next subsection).
 
 **`new-checkout-flow`** (boolean, used by the page and `./run.sh flags`)
 
@@ -156,7 +190,7 @@ Recreate these in your trial project if they are not already there. The code key
 4. Default / fallthrough: `false` (multi-step).
 5. Targeting On.
 
-Amelia (enterprise) gets one-page checkout via the rule. Liam (`org-bright` / free) gets multi-step via the free rule. Harper gets one-page as an individual target (`TARGET_MATCH`). All of this stays inside the classic Amelia lavender UI.
+Amelia (enterprise) gets one-page checkout via the rule. Liam (`org-bright` / free) gets multi-step via the free rule. Harper gets one-page as an individual target (`TARGET_MATCH`). Chrome is independent (`new-booking-ui`); both flows work in Harbor Dusk or classic.
 
 **Flag trigger (Part 1 remediate — skin)**
 
@@ -226,15 +260,44 @@ Do not use `./run.sh experiment` for this flag; that command still drives `new-c
 
 ### Completion config `support-assistant`
 
-AgentControl / AI Config in **completion** mode. Typical variations:
+AgentControl / AI Config in **completion** mode. Create three variations. Keys should be `grounded`, `concise`, and `detailed` (the app also treats a key of `support-assistant` as detailed for simulated metrics).
 
-| Variation | Who gets it | Intent |
-|---|---|---|
-| `grounded` | `user.plan` is `enterprise` | Official rates and policies in the system prompt (Sonnet) |
-| `concise` | fallthrough experiment (50%, control) | Short, less grounded (Haiku) |
-| `detailed` | fallthrough experiment (50%) | Longer answers (Sonnet) |
+| Variation key | Model (picker) | Who gets it | Intent |
+|---|---|---|---|
+| `grounded` | Claude Sonnet | `user.plan` is `enterprise` | Official rates in the system prompt |
+| `concise` | Claude Haiku | fallthrough experiment (50%, control) | Short, no facts → often invents rates |
+| `detailed` | Claude Sonnet | fallthrough experiment (50%) | Longer answers, still no official facts |
 
-Turn targeting **On in the same environment as the SDK key** (usually `test`).
+**Targeting in Test:** On. Rule: context kind **user**, attribute `plan`, is one of `enterprise` → `grounded`. Default / fallthrough: 50/50 experiment **or** `concise` until the experiment exists. Off variation: disabled.
+
+Paste this **system** message on **`grounded` only**. Keep `{{product}}` and `{{ldctx.name}}`. Concise and detailed should **not** include these facts (so Liam’s Accuracy stays low).
+
+```
+You are a detailed babysitting support assistant for {{product}}. Address the user as {{ldctx.name}}.
+Answer only from the facts below. If it is not listed, say you do not have that policy. Never invent fees, notice windows, or procedures.
+
+Facts:
+- Evening sitters start at 18:00. Typical booking is about 4 hours.
+- Saturday and weekend evenings are available. Weekday daytime is limited.
+- Sitters: Maya Chen ($28/hr, evenings and weekends), Jordan Blake ($24/hr, evenings and weekends), Sam Ortiz ($20/hr, weekday daytime only). Extra child is $4–$6/hr.
+- All listed sitters are background-checked before they appear in the catalog.
+- Cancel or change at least 12 hours before start, no fee. Inside 12 hours, charge one hour at the sitter's rate.
+- You cannot create a booking from this chat.
+
+Be specific and short. Use only these rules.
+```
+
+Concise system message:
+
+```
+You are a brief babysitting support assistant for {{product}}. Keep answers to 1–2 short sentences. Address the user as {{ldctx.name}}.
+```
+
+Detailed system message:
+
+```
+You are a detailed babysitting support assistant for {{product}}. Give step-by-step help. Address the user as {{ldctx.name}}.
+```
 
 ### AI Config experiment (`support-assistant-prompt-model`)
 
@@ -257,24 +320,66 @@ Results: LaunchDarkly → Experiments → **Support Assistant Prompt/Model A/B**
 
 ### Judge `babysitting-service-reply-accuracy`
 
-Judge-mode config. The Java AI SDK **does not** auto-run judges attached in the UI. After each Ask, `AiAssistant` calls `judgeConfig` and `Judge.evaluate`.
+Judge-mode config. Key must be exactly that string. The Java AI SDK **does not** auto-run judges attached in the UI. After each Ask, `AiAssistant` calls `judgeConfig` and `Judge.evaluate`.
 
-The judge and the grounded assistant need the **same official facts**. If the judge does not know those facts, it scores grounded answers as hallucinations.
+Create a **Default** variation (Haiku is enough). Targeting **On in test**, fallthrough → that variation (not the disabled stub).
+
+The judge and **`grounded`** must share the **same official facts**. If the judge does not list them, it scores Amelia’s answers as hallucinations.
+
+Paste as the judge system / criteria message (keep the `{{message_history}}` / `{{response_to_evaluate}}` placeholders the UI adds):
+
+```
+You are a business information accuracy and safety expert. Evaluate the AI-generated response for factual correctness and task relevance to the user’s question about Amelia’s Babysitting Service.
+
+Score whether the support assistant reply is accurate for Amelia's Babysitting Service.
+
+Official facts (these are true; citing them is correct, not a hallucination):
+- Evening sitters start at 18:00. Typical booking is about 4 hours.
+- Saturday and weekend evenings are available. Weekday daytime is limited.
+- Sitters: Maya Chen ($28/hr, evenings and weekends), Jordan Blake ($24/hr, evenings and weekends), Sam Ortiz ($20/hr, weekday daytime only). Extra child is $4–$6/hr.
+- All listed sitters are background-checked.
+- Cancel or change at least 12 hours before start, no fee. Inside 12 hours, charge one hour at the sitter's rate.
+- This chat cannot create a booking.
+
+Score 1.0 if the reply uses only these facts and answers the question.
+Score 0.5 if it is incomplete but does not invent policy.
+Score 0.0 if it invents fees, notice windows, sitters, or hours not listed above, or if it is a stub that only repeats the question.
+
+Do not penalize naming Sam Ortiz, 18:00, or the 12-hour cancel rule.
+```
 
 The Accuracy card is the **latest Ask only**, not an average. Switching shoppers clears the last answer.
 
-Targeting for the judge must be On in **test**, not only Production.
-
 ### Agent config `booking-helper`
 
-Agent mode (tools). Java cannot evaluate this; the Python sidecar does.
+Agent mode. Java cannot evaluate this; the Python sidecar does. **Create the three tools in the LaunchDarkly tool library first**, then attach them to variations. Keys must match `booking/sitters.py` (`TOOL_HANDLERS`). LaunchDarkly does not import that file.
 
-| Variation | Tools | Who |
+| Tool key | Parameters (required) | Description |
 |---|---|---|
-| `assistant` | find sitters, quote price | default (Liam) |
-| `full-booking-agent` | those plus `create_booking` | enterprise parents (Amelia, Harper) |
+| `find_available_sitters` | `date` (string, YYYY-MM-DD), `start_time` (string, HH:MM), `hours` (number) | Find sitters for a window. Does not book. |
+| `quote_price` | `sitter_id` (string), `hours` (number), `children` (integer) | Quote a price. Does not book. |
+| `create_booking` | `sitter_id` (string), `date` (string), `start_time` (string), `hours` (number) | Book only after the parent confirms. |
 
-Tools are definitions only. The app runs them (`booking/sitters.py`: Maya, Jordan, Sam).
+Then create config **`booking-helper`** (agent mode):
+
+| Variation key | Tools | Model | Who |
+|---|---|---|---|
+| `assistant` | `find_available_sitters`, `quote_price` | Haiku | default (Liam / free) |
+| `full-booking-agent` | those plus `create_booking` | Sonnet | `user.plan` is `enterprise` (Amelia, Harper) |
+
+**`assistant` instructions:**
+
+```
+You are a babysitting booking assistant for Amelia's Babysitting Service. Help a parent find an available sitter and quote a price. Use find_available_sitters and quote_price. You cannot create a booking. If the parent asks you to book, tell them this plan cannot book and a person has to confirm it. Ask for the date, start time, duration, and number of children when they are missing. Be concise.
+```
+
+**`full-booking-agent` instructions:**
+
+```
+You are a babysitting booking agent for Amelia's Babysitting Service. Help a parent find an available sitter, quote a price, and book only after they explicitly confirm. Use find_available_sitters and quote_price first. Call create_booking only after the parent confirms the sitter, date, start time, hours, and price. Never book without that confirmation. Be concise.
+```
+
+**Targeting in Test:** On. Rule: **user** `plan` is one of `enterprise` → `full-booking-agent`. Fallthrough → `assistant`. Off variation: disabled.
 
 **Find Sitters** is a live Claude turn when `ANTHROPIC_API_KEY` is set. **Confirm Booking** is deterministic: it applies tools locally (Maya next Saturday 18:00, or Jordan) so a new stateless POST does not lose the quote. Each `/api/booking` request is a new turn with no chat history.
 
