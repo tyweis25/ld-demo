@@ -14,7 +14,7 @@ import java.util.Random;
  * Every simulated shopper is a multi-context (user + organization), same as FeatureFlagDemo.
  *
  * Options (all optional):
- *   --flag=new-checkout-flow   flag to evaluate (create this boolean flag; use new-payment-service for guarded)
+ *   --flag=new-checkout-flow   flag to evaluate (create this boolean flag; use new-checkout-service for guarded)
  *   --minutes=15               how long to run
  *   --rate=20                  sessions per second
  *   --users=3000               size of the simulated user pool (each counts as a context in LD)
@@ -24,7 +24,7 @@ import java.util.Random;
  *
  * Run:
  *   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=20"
- *   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-payment-service --bad"
+ *   mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-checkout-service --bad"
  */
 public class TrafficSimulator {
 

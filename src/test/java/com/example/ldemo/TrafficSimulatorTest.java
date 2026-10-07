@@ -20,13 +20,13 @@ class TrafficSimulatorTest {
         assertFalse(defaults.bad);
 
         TrafficSimulator.Options custom = TrafficSimulator.parseOptions(new String[]{
-                "--flag=new-payment-service",
+                "--flag=new-checkout-service",
                 "--minutes=30",
                 "--rate=5",
                 "--users=100",
                 "--bad"
         });
-        assertEquals("new-payment-service", custom.flagKey);
+        assertEquals("new-checkout-service", custom.flagKey);
         assertEquals(30, custom.minutes);
         assertEquals(5, custom.rate);
         assertEquals(100, custom.users);

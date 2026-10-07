@@ -46,7 +46,7 @@ case "${1:-help}" in
     ;;
   flags)       need_key; run FeatureFlagDemo ;;
   experiment)  need_key; run TrafficSimulator "--minutes=${2:-30} --users=${3:-5000}" ;;
-  guarded)     need_key; run TrafficSimulator "--flag=new-payment-service --bad --minutes=${2:-30}" ;;
+  guarded)     need_key; run TrafficSimulator "--flag=new-checkout-service --bad --minutes=${2:-30}" ;;
   remediate)
     # Remediate skin: POST the LaunchDarkly generic "turn off" trigger URL for new-booking-ui.
     # Create the trigger on flag new-booking-ui, copy the secret URL into .env as LD_FLAG_TRIGGER_URL.
@@ -94,7 +94,7 @@ Usage: ./run.sh <command>
   web                Web front end at http://localhost:8080
   flags              Feature flag demo (multi-context targeting, live change)
   experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min, 5000 users)
-  guarded [min]      Bad-release traffic for the guarded rollout on new-payment-service
+  guarded [min]      Bad-release traffic for the guarded rollout on new-checkout-service
   remediate          POST LD_FLAG_TRIGGER_URL to turn off new-booking-ui (classic chrome)
   ai                 AI Config demo with kill switch
   ai-experiment [n] [asks]  Free-tier traffic for support-assistant experiment (default 120×1)

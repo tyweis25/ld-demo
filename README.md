@@ -16,6 +16,7 @@ Maps to the LaunchDarkly SE Technical Exercise. Java is the server SDK (one of t
 | **Part 1 — Booking UI skin** | Boolean `new-booking-ui`: Harbor Dusk chrome (true) vs classic Amelia lavender (false). Fallthrough true for everyone when On. | Toggle `new-booking-ui` in LaunchDarkly. |
 | **Part 1 — Instant release / rollback** | SDK `addFlagChangeListener` → **SSE** (`GET /api/events`). Skin and form both live-update without reload. | Flip either flag while the page is open. |
 | **Part 1 — Remediate** | Generic flag trigger on **`new-booking-ui`** (not checkout). `LD_FLAG_TRIGGER_URL` + `./run.sh remediate` / in-UI Remediate → classic chrome. Checkout targeting unchanged. | Create trigger on `new-booking-ui` → `.env` → remediate. |
+| **Guarded rollout** | Boolean `new-checkout-service` (not the page). Default rule: Guardian serving `true`, metric **Checkout errors**, auto rollback. `TrafficSimulator --bad` injects ~15% errors on `true`. | Start the rollout in Test, then `./run.sh guarded`. Watch **Monitoring → Releases**. |
 | **Part 2 — Feature flag** | Same booking component and flag as Part 1. | Switch shoppers on the page. |
 | **Part 2 — Context attributes** | Multi-context `user` + `organization`: `key`, `name`, `role`, `plan` on user; `tier` on org (`CheckoutService.contextFrom`). | Booking As: Amelia / Harper / Liam. |
 | **Part 2 — Individual targeting** | Target user key `user-harper` to serve `true`. Inspector reason: `TARGET_MATCH` (individual targets are evaluated **before** rules). For a clearer “beats the free-tier rule” demo, temporarily add `user-liam` → `true`, then remove it again. | Select Harper (reason `TARGET_MATCH`). |
@@ -166,11 +167,21 @@ Amelia (enterprise) gets one-page checkout via the rule. Liam (`org-bright` / fr
 
 `new-checkout-flow` targeting is unchanged by remediate. The AI assistant button still uses REST (`LD_API_TOKEN`) against `ai-assistant-enabled`.
 
-**`new-payment-service`** (boolean, optional guarded-rollout beyond the lab)
+**`new-checkout-service`** (boolean, guarded rollout — not used by the web page)
 
-Separate from the checkout experiment so the two stories do not collide. Targeting On. Default rule: guarded rollout serving `true`, monitoring **Checkout errors** with automatic rollback.
+Keeps Guardian off `new-checkout-flow` so the experiment and the unsafe-release story do not share a flag. The page never evaluates this key. Only `./run.sh guarded` does.
 
-`./run.sh guarded` evaluates this flag and injects a 15% error rate on the new variation.
+In **Test** (leave Production Off):
+
+1. Targeting **On**.
+2. Default rule: **Guarded rollout**, target variation **`true`** (control is `false`).
+3. Metric **Checkout errors** (`checkout-error`, lower is better), **Auto rollback** on.
+4. Target by **user**.
+5. Custom stages: 5% / 10% / 25% / 50% for 5 minutes each (20 minutes, then 100%).
+
+If Target variation is stuck on `false`, `true` is locked as the original. Serve a single variation **`false`**, save, then create the guarded rollout again.
+
+`./run.sh guarded` runs `TrafficSimulator --flag=new-checkout-service --bad` (~15% errors on `true` vs ~2% on `false`). After a regression, Guardian sets the default rule back to **`false`**. Results: the flag’s **Monitoring → Releases** tab.
 
 **`ai-assistant-enabled`** (boolean kill switch)
 
@@ -203,13 +214,15 @@ The simulator’s new flow converts better (about 32% vs 25%) and has a higher a
 
 ### Guarded rollout
 
-On `new-payment-service`, guarded rollout serving `true`, metric Checkout errors, automatic rollback, shortest stages the UI allows. Then:
+On **`new-checkout-service`** in Test (see flag setup above). Start the rollout in the LaunchDarkly UI first, then:
 
 ```bash
 ./run.sh guarded 30
 ```
 
-With `--bad`, new-variation errors are 15% vs 2% on the old variation.
+That is 30 minutes of traffic, enough to cover the 20-minute custom ramp. With `--bad`, new-variation (`true`) errors are about 15% vs 2% on `false`. Guardian should detect **Checkout errors** and roll the default rule back to `false` without turning targeting Off.
+
+Do not use `./run.sh experiment` for this flag; that command still drives `new-checkout-flow`.
 
 ### Completion config `support-assistant`
 
@@ -280,7 +293,7 @@ The sidecar stays up for the life of `./run.sh web`. It does not book on a timer
 | `web` | Sidecar on 8081 + page on 8080 |
 | `flags` | Console multi-context demo |
 | `experiment [min]` | Traffic for `new-checkout-flow` (default 30 min, 5000 users) |
-| `guarded [min]` | Bad-release traffic for `new-payment-service` |
+| `guarded [min]` | Bad-release traffic for `new-checkout-service` |
 | `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-booking-ui` (classic chrome) |
 | `ai` | Console AI Config + kill switch |
 | `ai-experiment [n] [asks]` | Free-tier Ask traffic for `support-assistant` experiment (default 120×1) |
@@ -293,7 +306,7 @@ Equivalent Maven:
 export LD_SDK_KEY=sdk-your-key-here
 mvn -q compile exec:java
 mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=30"
-mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-payment-service --bad --minutes=30"
+mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-checkout-service --bad --minutes=30"
 mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 ```
 
