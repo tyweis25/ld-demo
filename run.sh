@@ -93,13 +93,13 @@ Usage: ./run.sh <command>
   build              Compile the project
   web                Web front end at http://localhost:8080
   flags              Feature flag demo (multi-context targeting, live change)
-  experiment [min]   Traffic for the experiment on new-checkout-flow (default 30 min, 5000 users)
+  experiment [min] [users]  Traffic for the experiment on new-checkout-flow (default 30 min, 5000 users)
   guarded [min]      Bad-release traffic for the guarded rollout on new-checkout-service
   remediate          POST LD_FLAG_TRIGGER_URL to turn off new-booking-ui (classic chrome)
   ai                 AI Config demo with kill switch
   ai-experiment [n] [asks]  Free-tier traffic for support-assistant experiment (default 120×1)
   booking [parent]   Agent booking helper (amelia or liam). Add --confirm to book.
-  demo               Interview run: flags, then AI
+  demo               flags, then AI
 USAGE
     ;;
 esac

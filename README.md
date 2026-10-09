@@ -132,7 +132,7 @@ booking/.venv/bin/pip install -r booking/requirements.txt
 
 ## Shoppers (multi-context)
 
-Every evaluation is a **user + organization** multi-context. Account-level rules target `organization.tier`. AI and booking rules target `user.plan`. The page sends `plan` equal to the org `tier` so those stay in sync.
+Every evaluation is a **user + organization** multi-context. Account-level rules target `organization.tier`. AI and booking rules target `user.plan`. The **web page** and booking sidecar send `plan` equal to the org `tier` so those stay in sync. `./run.sh flags` (`FeatureFlagDemo`) sets `role` and org `tier` only — it does not set `plan`.
 
 | Shopper | User key | Role | Org | Tier / plan |
 |---|---|---|---|---|
@@ -244,7 +244,7 @@ On `new-checkout-flow`, attach an experiment to the **default rule** (enterprise
 ./run.sh experiment 30
 ```
 
-The simulator’s new flow converts better (about 32% vs 25%) and has a higher average order.
+That is 30 minutes and 5,000 users (`./run.sh experiment [min] [users]`). Raw Maven without those args uses the class defaults (15 min, 3,000 users). The simulator’s new flow converts better (about 32% vs 25%) and has a higher average order.
 
 ### Guarded rollout
 
@@ -308,6 +308,8 @@ Experiment **Support Assistant Prompt/Model A/B** on the AI Config **default rul
 | Assistant helpful | Primary | `assistant-helpful` |
 | Assistant reply | Secondary | `assistant-reply` |
 | Assistant latency (ms) | Secondary | `assistant-latency-ms` |
+
+Attach **concise** (control) vs **detailed** on the default rule, then start an iteration. Recreating `detailed` gets a new variation id — re-attach it if the experiment still points at a deleted variation. Traffic without a running iteration still evaluates configs; it does not fill experiment results.
 
 `AiAssistant.ask` tracks these after every successful reply (web Ask, `./run.sh ai`, `./run.sh ai-experiment`). Live answers use the accuracy judge (≥ 0.6 = helpful); simulated answers treat detailed/grounded as helpful and concise as not, so the arms still separate without Anthropic.
 
@@ -383,7 +385,7 @@ You are a babysitting booking agent for Amelia's Babysitting Service. Help a par
 
 **Find Sitters** is a live Claude turn when `ANTHROPIC_API_KEY` is set. **Confirm Booking** is deterministic: it applies tools locally (Maya next Saturday 18:00, or Jordan) so a new stateless POST does not lose the quote. Each `/api/booking` request is a new turn with no chat history.
 
-The sidecar stays up for the life of `./run.sh web`. It does not book on a timer. The page polls `/api/booking-status` every 2 seconds; Find / Confirm POST `/api/booking`.
+The sidecar stays up for the life of `./run.sh web`. It does not book on a timer. The page polls checkout and `/api/booking-status` every 3 seconds (SSE is the live path; poll is the fallback). Find / Confirm POST `/api/booking`.
 
 ## Commands
 
@@ -397,7 +399,7 @@ The sidecar stays up for the life of `./run.sh web`. It does not book on a timer
 | `build` | `mvn clean compile` |
 | `web` | Sidecar on 8081 + page on 8080 |
 | `flags` | Console multi-context demo |
-| `experiment [min]` | Traffic for `new-checkout-flow` (default 30 min, 5000 users) |
+| `experiment [min] [users]` | Traffic for `new-checkout-flow` (default 30 min, 5000 users) |
 | `guarded [min]` | Bad-release traffic for `new-checkout-service` |
 | `remediate` | POST `LD_FLAG_TRIGGER_URL` to turn off `new-booking-ui` (classic chrome) |
 | `ai` | Console AI Config + kill switch |
@@ -410,7 +412,7 @@ Equivalent Maven:
 ```bash
 export LD_SDK_KEY=sdk-your-key-here
 mvn -q compile exec:java
-mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=30"
+mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--minutes=30 --users=5000"
 mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.TrafficSimulator -Dexec.args="--flag=new-checkout-service --bad --minutes=30"
 mvn -q compile exec:java -Dexec.mainClass=com.example.ldemo.AiConfigDemo
 ```
@@ -423,7 +425,7 @@ The inspector at the top shows checkout variation, assistant on/off, booking-age
 - **Chrome:** `new-booking-ui` on → Harbor Dusk skin; off → classic Amelia lavender.
 - **Multi-step booking** (`new-checkout-flow` off): Address → Payment → Review (works in either chrome).
 - **One-page booking** (`new-checkout-flow` on): all three on one page (works in either chrome).
-- **SSE** (`/api/events`) live-updates both skin and form. A 3s poll remains as fallback.
+- **SSE** (`/api/events`) live-updates both skin and form. A 3-second poll remains as fallback (and refreshes booking-helper status).
 - **Ask** runs `support-assistant`, then the accuracy judge. Amelia’s grounded answers should score high; Liam’s concise answers often invent rates and score near 0%.
 - **Turn Off AI Assistant** PATCHes `ai-assistant-enabled` through the REST API when `LD_API_TOKEN` is set.
 - **Remediate To Classic Chrome** (Harbor only) POSTs `/api/remediate` → turns off `new-booking-ui`. Same as `./run.sh remediate`. Does not change checkout flow.
